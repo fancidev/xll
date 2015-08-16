@@ -20,15 +20,24 @@ class ExcelVariant : public XLOPER12
 		memset(this, 0, sizeof(*this));
 	}
 
+	static ExcelVariant FromType(WORD xltype)
+	{
+		ExcelVariant v;
+		v.xltype = xltype;
+		return v;
+	}
+
 public:
+
+	static const ExcelVariant Empty;
+	static const ExcelVariant Missing;
+
 	ExcelVariant()
 	{
 		Reset();
 	}
 
 	ExcelVariant(const ExcelVariant &other) = delete;
-	//{
-	//}
 
 	ExcelVariant& operator=(const ExcelVariant &other) = delete;
 
@@ -269,7 +278,6 @@ struct FunctionInfoFactory<TRet(TArgs...)>
 	}
 };
 
-
 class ExcelException : public std::exception
 {
 	int m_errorCode;
@@ -323,153 +331,19 @@ public:
 
 class AddinRegistrar
 {
+public:
 	static std::vector<FunctionInfo> & registry()
 	{
 		static std::vector<FunctionInfo> s_functions;
 		return s_functions;
 	}
 
-	static int RegisterFunction(LPXLOPER12 dllName, const FunctionInfo &f)
-	{
-		if (f.arguments.size() > 245)
-			throw std::invalid_argument("Too many arguments");
-
-		std::wstring argumentText;
-		if (f.arguments.size() > 0)
-		{
-			argumentText = f.arguments[0].name();
-			for (size_t i = 1; i < f.arguments.size(); i++)
-			{
-				argumentText += L", ";
-				argumentText += f.arguments[i].name();
-			}
-		}
-
-		ExcelVariant opers[256];
-		// opers[0] = dllName;
-		opers[1] = f.entryPoint;
-		opers[2] = f.typeText;
-		opers[3] = f.name;
-		if (argumentText.empty())
-			opers[4] = (wchar_t*)nullptr;
-		else
-			opers[4] = argumentText;
-		opers[5] = f.macroType;
-		opers[6] = f.category;
-		opers[7] = f.shortcut;
-		opers[8] = f.helpTopic;
-		opers[9] = f.description;
-		for (size_t i = 0; i < f.arguments.size(); i++)
-			opers[10 + i] = f.arguments[i].description();
-
-		LPXLOPER12 popers[256];
-		popers[0] = dllName;
-		for (size_t i = 1; i < 10u + f.arguments.size(); i++)
-			popers[i] = &opers[i];
-
-		XLOPER12 id;
-		int ret = Excel12v(xlfRegister, &id, 10 + f.arguments.size(), popers);
-		return ret;
-	}
-
-public:
 	static FunctionInfo& AddFunction(FunctionInfo &f)
 	{
 		registry().push_back(f);
 		return registry().back();
 	}
-
-	static void RegisterAllFunctions()
-	{
-		XLOPER12 xDLL;
-		Excel12(xlGetName, &xDLL, 0); // TODO: check return value
-		for (FunctionInfo& f : registry())
-		{
-			RegisterFunction(&xDLL, f);
-		}
-		Excel12(xlFree, 0, 1, &xDLL);
-	}
 };
-
-
-template <typename Func, Func *, typename> struct NamedFunction;
-
-template <typename Func, Func *func, typename TRet, typename... TArgs>
-struct NamedFunction < Func, func, TRet(TArgs...) >
-{
-private:
-	std::string m_name;
-	std::string m_description;
-	std::vector<NameDescriptionPair> m_args;
-
-	NamedFunction() {}
-	NamedFunction(const NamedFunction<Func,func,Func>&) = delete;
-
-public:
-
-	static NamedFunction<Func,func,Func>& Instance()
-	{
-		static NamedFunction<Func, func, Func> s_instance;
-		return s_instance;
-	}
-
-	std::string Prototype()
-	{
-		return Prototype(func);
-	}
-
-	typedef NamedFunction<Func, func, Func> self_type;
-
-	self_type & Name(const std::string &name)
-	{
-		m_name = name;
-		return (*this);
-	}
-
-	self_type & Description(const std::string &description)
-	{
-		m_description = description;
-		return (*this);
-	}
-
-	self_type & Arg(const std::string &name, const std::string &description)
-	{
-		m_args.push_back(NameDescriptionPair(name, description));
-		return (*this);
-	}
-
-private:
-
-	template <typename TRet, typename... TArgs>
-	std::string Prototype(TRet(*)(TArgs...))
-	{
-		return std::string(typeid(TRet).name()) + " " + m_name +
-			"(" + FormatArgument<TArgs...>(0) + ")";
-	}
-
-	template <typename First, typename Second, typename... Rest>
-	std::string FormatArgument(size_t k)
-	{
-		return std::string(typeid(First).name()) +
-			(k < m_args.size() ? " " + m_args[k] : std::string()) + ", " +
-			FormatArgument<Second, Rest...>(k + 1);
-	}
-
-	template <typename TArg>
-	std::string FormatArgument(size_t k)
-	{
-		return std::string(typeid(TArg).name()) +
-			(k < m_args.size() ? " " + m_args[k] : std::string());
-	}
-
-	std::string FormatArgument(size_t)
-	{
-		return "";
-	}
-};
-
-#define NAMED_FUNCTION(f) NamedFunction<decltype(f), f, decltype(f)>::Instance()
-
 
 #if !defined(_WIN64)
 // On 32-bit platform, we use naked function to emit a JMP instruction,
