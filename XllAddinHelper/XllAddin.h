@@ -138,13 +138,13 @@ public:
 		switch (xltype)
 		{
 		case xltypeStr:
-			//free(val.str);
+			free(val.str);
 			break;
 		case xltypeRef:
-			//free(val.mref.lpmref);
+			free(val.mref.lpmref);
 			break;
 		case xltypeMulti:
-			//free(val.array.lparray);
+			free(val.array.lparray);
 			break;
 		}
 		Reset();
