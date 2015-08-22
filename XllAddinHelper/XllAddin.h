@@ -9,6 +9,10 @@
 #include <array>
 #include <type_traits>
 
+// Excel defines a variant-like XLOPER type. We wrap this data type in
+// ExcelVariant to simplify operations.
+#pragma region Excel data types
+
 class ExcelRef : public xlref12
 {
 };
@@ -159,18 +163,83 @@ public:
 		Reset();
 	}
 };
+#pragma endregion
+
+// When Excel calls a UDF, it supports passing certain types of argument
+// directly. We must "unbox" these incoming arguments to the native type.
+// Likewise, we must "box" the native return value of the function to a
+// data type that Excel supports.
+#pragma region Argument and return value marshalling
+
+template <typename T> struct fake_dependency : public std::false_type {};
 
 template <typename T>
-struct Boxed
+struct UdfArgument
 {
-	typedef T type;
+	static_assert(fake_dependency<T>::value, 
+		"The supplied type is not supported as a udf argument. "
+		"Specialize UdfArgument<T> to support it.");
+	typedef T boxed_type;
+	static inline T unbox(T value) { return value; }
 };
 
-template <>
-struct Boxed < std::string >
+template <typename T, typename TBoxed = T>
+struct UdfArgumentImpl
 {
-	typedef const char * type;
+	typedef TBoxed boxed_type;
+	static inline T unbox(TBoxed v) { return v; }
 };
+
+#define MARSHAL_UDF_ARGUMENT(NativeType, BoxedType) \
+	template <> struct UdfArgument<NativeType> : UdfArgumentImpl<NativeType, BoxedType> {}
+
+MARSHAL_UDF_ARGUMENT(int,          int);
+MARSHAL_UDF_ARGUMENT(double,       double);
+MARSHAL_UDF_ARGUMENT(std::wstring, const wchar_t *);
+
+template <typename T>
+struct UdfReturnValue
+{
+	static_assert(fake_dependency<T>::value, "The supplied return value is not supported.");
+	static_assert(fake_dependency<T>::value, "Specialize UdfReturnValue<T> to support it.");
+	typedef T boxed_type;
+	static boxed_type box(const T &);
+};
+
+#define IMPLEMENT_SIMPLE_RETURN_VALUE(type) \
+	template <> struct UdfReturnValue<type> \
+	{ \
+		typedef type boxed_type; \
+		static inline type box(const type &v) { return v; } \
+	};
+
+IMPLEMENT_SIMPLE_RETURN_VALUE(int);
+IMPLEMENT_SIMPLE_RETURN_VALUE(double);
+
+template <> struct UdfReturnValue < std::wstring >
+{
+	typedef LPXLOPER12 boxed_type;
+	static inline LPXLOPER12 box(const std::wstring &s)
+	{
+		LPXLOPER12 op = (LPXLOPER12)malloc(sizeof(XLOPER12));
+		if (op == NULL)
+			throw std::bad_alloc();
+
+		LPWSTR buffer = (LPWSTR)malloc(sizeof(wchar_t)*(s.size() + 1));
+		if (buffer == NULL)
+			throw std::bad_alloc();
+
+		buffer[0] = (wchar_t)s.size();
+		memcpy(&buffer[1], s.c_str(), sizeof(wchar_t)*s.size());
+
+		op->xltype = xltypeStr;
+		op->val.str = buffer;
+		return op;
+		// todo: set the xlDLLFree bit
+	}
+};
+
+#pragma endregion
 
 #define EXPORT_UNDECORATED_NAME comment(linker, "/export:" __FUNCTION__ "=" __FUNCDNAME__)
 
@@ -194,12 +263,28 @@ public:
 	LPCWSTR description() const { return m_description; }
 };
 
-template <typename T> struct ArgumentTypeText;
+#if 0
+template <typename T> struct fake_dependency : public std::false_type {};
+template <typename T> struct ArgumentTypeText
+{
+	static_assert(fake_dependency<T>::value, "Does not support marshalling of the supplied type.");
+};
 
 #define DECLARE_ARGUMENT_TYPE_TEXT(type, text) \
 	template <> struct ArgumentTypeText < type > { \
 		static const wchar_t * getTypeText() { return L##text; } \
 	};
+
+#define GET_ARGUMENT_TYPE_TEXT(type) ArgumentTypeText<type>::getTypeText()
+#else
+template <typename T> inline const wchar_t * getTypeText()
+{
+	static_assert(false, "Does not support marshalling of the supplied type.");
+}
+#define DECLARE_ARGUMENT_TYPE_TEXT(type, text) \
+	template<> inline const wchar_t * getTypeText<type>() { return L##text; }
+#define GET_ARGUMENT_TYPE_TEXT(type) getTypeText<type>()
+#endif
 
 DECLARE_ARGUMENT_TYPE_TEXT(bool,       "A");
 DECLARE_ARGUMENT_TYPE_TEXT(bool*,      "L");
@@ -212,6 +297,7 @@ DECLARE_ARGUMENT_TYPE_TEXT(int16_t*,   "M");
 DECLARE_ARGUMENT_TYPE_TEXT(int32_t,    "J");
 DECLARE_ARGUMENT_TYPE_TEXT(int32_t*,   "N");
 DECLARE_ARGUMENT_TYPE_TEXT(wchar_t*,   "C%");
+DECLARE_ARGUMENT_TYPE_TEXT(LPCWSTR,    "C%");
 DECLARE_ARGUMENT_TYPE_TEXT(LPXLOPER12, "Q");
 
 struct FunctionInfo
@@ -260,14 +346,15 @@ struct FunctionInfoFactory<TRet(TArgs...)>
 	template <typename T>
 	static LPCWSTR GetTypeText()
 	{
-		return ArgumentTypeText<std::remove_const<T>::type>::getTypeText();
+		return GET_ARGUMENT_TYPE_TEXT(typename std::decay<T>::type);
 	}
 
 	static FunctionInfo Create(LPCWSTR entryPoint)
 	{
 		const int NumArgs = sizeof...(TArgs);
 		std::array<LPCWSTR, NumArgs + 1> texts = {
-			GetTypeText<TRet>(), GetTypeText<TArgs>()...
+			GetTypeText<typename UdfReturnValue<typename std::decay<TRet>::type>::boxed_type>(),
+			GetTypeText<typename UdfArgument<typename std::decay<TArgs>::type>::boxed_type>()...
 		};
 		std::wstring s;
 		for (int i = 0; i <= NumArgs; i++)
@@ -276,6 +363,12 @@ struct FunctionInfoFactory<TRet(TArgs...)>
 		}
 		return FunctionInfo(s.c_str(), entryPoint);
 	}
+};
+
+template <typename TRet, typename... TArgs>
+struct FunctionInfoFactory<TRet __stdcall(TArgs...)> 
+	: public FunctionInfoFactory<TRet(TArgs...)>
+{
 };
 
 class ExcelException : public std::exception
@@ -353,9 +446,11 @@ template <typename Func, Func *func, typename> struct XLWrapper { };
 template <typename Func, Func *func, typename TRet, typename... TArgs>
 struct XLWrapper < Func, func, TRet(TArgs...) >
 { 
-	static typename Boxed<TRet>::type __stdcall Call(typename Boxed<TArgs>::type... args)
+	static typename UdfReturnValue<typename std::decay<TRet>::type>::boxed_type __stdcall
+		Call(typename UdfArgument<typename std::decay<TArgs>::type>::boxed_type... args)
 	{
-		return func(args...);
+		return UdfReturnValue<typename std::decay<TRet>::type>::box(
+			func(UdfArgument<typename std::decay<TArgs>::type>::unbox(args)...));
 	}
 };
 
@@ -365,6 +460,8 @@ struct XLWrapper < Func, func, TRet(TArgs...) >
 		static const void *fp = static_cast<const void *>(implementation); \
 		__asm { jmp [fp] } \
 	}
+
+#define WRAPPER_TYPE(f) std::remove_pointer<decltype(XLWrapper<decltype(f), f, decltype(f)>::Call)>::type
 
 #define EXPORT_XLL_FUNCTION(f) \
 	EXPORT_DLL_FUNCTION(XL##f, (XLWrapper<decltype(f), f, decltype(f)>::Call)) \

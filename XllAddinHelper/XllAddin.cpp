@@ -12,6 +12,14 @@ double __stdcall MyTestFunc(double x, double y)
 	return x * y;
 }
 
+const wchar_t * __stdcall MyToString(double x)
+{
+#pragma EXPORT_UNDECORATED_NAME
+	static wchar_t result[100];
+	swprintf(result, 100, L"%lf", x);
+	return result;
+}
+
 static int RegisterFunction(LPXLOPER12 dllName, const FunctionInfo &f)
 {
 	if (f.arguments.size() > 245)
@@ -74,6 +82,16 @@ static void RegisterAllFunctions()
 {
 	XLOPER12 xDLL;
 	Excel12(xlGetName, &xDLL, 0); // TODO: check return value
+
+#if 0
+	Excel12(xlfRegister, 0, 6,
+		&xDLL,
+		&ExcelVariant(L"MyToString"),
+		&ExcelVariant(L"C%B"),
+		&ExcelVariant(L"MyToString"),
+		&ExcelVariant(L"x"),
+		&ExcelVariant(1.0));
+#endif
 
 #if 0
 	Excel12(xlfRegister, 0, 10,
