@@ -17,13 +17,10 @@ class ExcelRef : public xlref12
 {
 };
 
+// Wraps an XLOPER12 and automatically releases memory on destruction.
+// Use this class when you pass arguments to an Excel function.
 class ExcelVariant : public XLOPER12
 {
-	void Reset()
-	{
-		memset(this, 0, sizeof(*this));
-	}
-
 	static ExcelVariant FromType(WORD xltype)
 	{
 		ExcelVariant v;
@@ -31,14 +28,22 @@ class ExcelVariant : public XLOPER12
 		return v;
 	}
 
+	static void Copy(XLOPER12& to, const XLOPER12 &from);
+
 public:
+	static void Erase(XLOPER12 &x);
 
 	static const ExcelVariant Empty;
 	static const ExcelVariant Missing;
 
 	ExcelVariant()
 	{
-		Reset();
+		xltype = 0;
+	}
+
+	explicit ExcelVariant(const XLOPER12 &other)
+	{
+		Copy(*this, other);
 	}
 
 	ExcelVariant(const ExcelVariant &other) = delete;
@@ -47,10 +52,13 @@ public:
 
 	ExcelVariant& operator=(ExcelVariant &&other)
 	{
-		XLOPER12 tmp;
-		memcpy(&tmp, &other, sizeof(XLOPER12));
-		memcpy(&other, this, sizeof(XLOPER12));
-		memcpy(this, &tmp, sizeof(XLOPER12));
+		if (&other != this)
+		{
+			XLOPER12 tmp;
+			memcpy(&tmp, &other, sizeof(XLOPER12));
+			memcpy(&other, this, sizeof(XLOPER12));
+			memcpy(this, &tmp, sizeof(XLOPER12));
+		}
 		return (*this);
 	}
 
@@ -148,27 +156,58 @@ public:
 
 	~ExcelVariant()
 	{
-		switch (xltype)
-		{
-		case xltypeStr:
-			free(val.str);
-			break;
-		case xltypeRef:
-			free(val.mref.lpmref);
-			break;
-		case xltypeMulti:
-			free(val.array.lparray);
-			break;
-		}
-		Reset();
+		Erase(*this);
+	}
+
+	// Returns the content of this object in a heap-allocated XLOPER12 suitable
+	// to be returned to Excel. The XLOPER12 has its xlbitDLLFree bit set. The
+	// content of this object is cleared.
+	LPXLOPER12 detach()
+	{
+		LPXLOPER12 p = (LPXLOPER12)malloc(sizeof(XLOPER12));
+		if (p == nullptr)
+			throw std::bad_alloc();
+		memcpy(p, this, sizeof(XLOPER12));
+		p->xltype |= xlbitDLLFree;
+		xltype = 0;
+		return p;
 	}
 };
 #pragma endregion
 
-// When Excel calls a UDF, it supports passing certain types of argument
-// directly. We must "unbox" these incoming arguments to the native type.
-// Likewise, we must "box" the native return value of the function to a
-// data type that Excel supports.
+#if 0
+//ExcelVariant ExcelCall(int xlfn);
+//ExcelVariant ExcelCall(int xlfn, const ExcelVariant &); // cannot pass XLOPER12 &
+
+template <typename... T>
+ExcelVariant ExcelCall(int xlfn, const T&... args)
+{
+	//va_list x;
+	//va_start;
+	// TODO: this function won't work or would invoke a copy constructor
+	// if the supplied argument is of type XLOPER12. This is not what we want.
+	const int NumArgs = sizeof...(args);
+	ExcelVariant xlArgs[NumArgs] = { args... };
+	LPXLOPER12 pArgs[NumArgs];
+	for (int i = 0; i < NumArgs; i++)
+		pArgs[i] = &xlArgs[i];
+
+	XLOPER12 result;
+	int ret = Excel12v(xlfn, &result, numargs, pArgs);
+	if (ret != xlretSuccess)
+		throw ExcelException(ret);
+
+	ExcelVariant vResult(result);
+	Excel12(xlFree, 0, 1, &result);
+	return vResult;
+}
+#endif
+
+// When Excel calls a UDF, it supports passing arguments of type LPXLOPER12
+// as well as several other native types. We call these "wrapped arguments".
+// We must "unwrap" these incoming arguments before forwarding the call to
+// the UDF. Likewise, we must "wrap" the return value of the udf to one of
+// the several return types supported by Excel.
 #pragma region Argument and return value marshalling
 
 template <typename T> struct fake_dependency : public std::false_type {};
@@ -225,21 +264,7 @@ template <> struct ReturnValueWrapper < std::wstring >
 	typedef LPXLOPER12 wrapped_type;
 	static inline LPXLOPER12 wrap(const std::wstring &s)
 	{
-		LPXLOPER12 op = (LPXLOPER12)malloc(sizeof(XLOPER12));
-		if (op == NULL)
-			throw std::bad_alloc();
-
-		LPWSTR buffer = (LPWSTR)malloc(sizeof(wchar_t)*(s.size() + 1));
-		if (buffer == NULL)
-			throw std::bad_alloc();
-
-		buffer[0] = (wchar_t)s.size();
-		memcpy(&buffer[1], s.c_str(), sizeof(wchar_t)*s.size());
-
-		op->xltype = xltypeStr;
-		op->val.str = buffer;
-		return op;
-		// todo: set the xlDLLFree bit
+		return ExcelVariant(s).detach();
 	}
 };
 

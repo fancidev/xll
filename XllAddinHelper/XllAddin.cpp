@@ -174,3 +174,104 @@ LPXLOPER12 WINAPI xlAddInManagerInfo12(LPXLOPER12 xAction)
 {
 	return 0;
 }
+
+void WINAPI xlAutoFree12(LPXLOPER12 p)
+{
+#pragma EXPORT_UNDECORATED_NAME
+	if (p)
+	{
+		ExcelVariant::Erase(*p);
+		free(p);
+	}
+}
+
+void ExcelVariant::Erase(XLOPER12 &x)
+{
+	switch (x.xltype)
+	{
+	case xltypeStr:
+		free(x.val.str);
+		break;
+	case xltypeRef:
+		free(x.val.mref.lpmref);
+		break;
+	case xltypeMulti:
+		free(x.val.array.lparray);
+		break;
+	}
+	x.xltype = 0;
+}
+
+void ExcelVariant::Copy(XLOPER12 &to, const XLOPER12 &from)
+{
+	if (&from == &to)
+		return;
+
+	memcpy(&to, &from, sizeof(XLOPER12));
+
+	switch (from.xltype)
+	{
+	case xltypeStr:
+		if (from.val.str != nullptr)
+		{
+			int len = (unsigned short)from.val.str[0];
+			to.val.str = (wchar_t*)malloc(sizeof(wchar_t)*(len + 1));
+			if (to.val.str == nullptr)
+				throw std::bad_alloc();
+			memcpy(to.val.str, from.val.str, sizeof(wchar_t)*(len + 1));
+		}
+		break;
+	case xltypeRef:
+		if (from.val.mref.lpmref != nullptr)
+		{
+			int count = from.val.mref.lpmref->count;
+			if (count == 0)
+			{
+				LPXLMREF12 p = (LPXLMREF12)malloc(sizeof(XLMREF12));
+				if (p == nullptr)
+					throw std::bad_alloc();
+				p->count = (WORD)count;
+				to.val.mref.lpmref = p;
+			}
+			else
+			{
+				LPXLMREF12 p = (LPXLMREF12)malloc(sizeof(XLMREF12) + sizeof(XLREF12)*(count - 1));
+				if (p == nullptr)
+					throw std::bad_alloc();
+				p->count = (WORD)count;
+				memcpy(p->reftbl, from.val.mref.lpmref->reftbl, sizeof(XLREF12)*count);
+				to.val.mref.lpmref = p;
+			}
+		}
+		break;
+	case xltypeMulti:
+		if (from.val.array.lparray != nullptr)
+		{
+			int count = from.val.array.rows * from.val.array.columns;
+			LPXLOPER12 p = (LPXLOPER12)malloc(sizeof(XLOPER12)*count); // todo: free if exception
+			if (p == nullptr)
+				throw std::bad_alloc();
+			for (int i = 0; i < count; i++)
+			{
+				Copy(p[i], from.val.array.lparray[i]);
+			}
+			to.val.array.lparray = p;
+		}
+		break;
+	case xltypeBigData:
+		if (from.val.bigdata.h.lpbData != nullptr && from.val.bigdata.cbData > 0)
+		{
+			size_t numBytes = from.val.bigdata.cbData;
+			BYTE *p = (BYTE*)malloc(numBytes);
+			if (p == nullptr)
+				throw std::bad_alloc();
+			memcpy(p, from.val.bigdata.h.lpbData, numBytes);
+			to.val.bigdata.h.lpbData = p;
+		}
+		else
+		{
+			to.xltype = 0;
+		}
+		break;
+	}
+}
