@@ -5,12 +5,12 @@ This project makes it extremely easy to make existing C++ functions available fo
 ```c++
 #include "XllAddin.h"
 
-double Square(double x)
+std::wstring ReverseString(const std::wstring &s)
 {
-	return x * x;
+	return std::wstring(s.crbegin(), s.crend());
 }
 
-EXPORT_XLL_FUNCTION(Square);
+EXPORT_XLL_FUNCTION(ReverseString);
 
 BOOL WINAPI DllMain(HANDLE hInstance, ULONG fdwReason, LPVOID lpReserved)
 {
@@ -45,8 +45,6 @@ Being a one-man project, there are a few limitations:
 - Only Excel 2007 and higher is supported as they expose a different interface than prior versions of Excel, which supports more parameters, longer strings, and larger worksheet range. Support for prior versions of Excel may be added later.
 
 - Only 32-bit Excel is supported at the moment. 64-bit support will be added later.
-
-You are more than welcome to help!
 
 ## License
 
