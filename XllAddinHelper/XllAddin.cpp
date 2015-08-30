@@ -275,3 +275,113 @@ void ExcelVariant::Copy(XLOPER12 &to, const XLOPER12 &from)
 		break;
 	}
 }
+
+static HRESULT Copy(VARIANT &v, const XLOPER12 &from, bool allowArray)
+{
+	HRESULT hr = S_OK;
+	VariantInit(&v);
+	switch (from.xltype)
+	{
+	case xltypeNum:
+		V_VT(&v) = VT_R8;
+		V_R8(&v) = from.val.num;
+		break;
+	case xltypeStr:
+		if (from.val.str != nullptr)
+		{
+			BSTR s = SysAllocStringLen(&from.val.str[1], from.val.str[0]);
+			if (s == nullptr)
+				hr = E_OUTOFMEMORY;
+			else
+			{
+				V_VT(&v) = VT_BSTR;
+				V_BSTR(&v) = s;
+			}
+		}
+		break;
+	case xltypeBool:
+		V_VT(&v) = VT_BOOL;
+		V_BOOL(&v) = from.val.xbool;
+		break;
+	case xltypeErr:
+		V_VT(&v) = VT_ERROR;
+		V_ERROR(&v) = 0x800A07D0 + from.val.err;
+		break;
+	case xltypeMissing:
+		V_VT(&v) = VT_ERROR;
+		V_ERROR(&v) = 0x80020004;
+		break;
+	case xltypeNil:
+		V_VT(&v) = VT_EMPTY;
+		break;
+	case xltypeInt:
+		V_VT(&v) = VT_I4;
+		V_I4(&v) = from.val.w;
+		break;
+	case xltypeMulti:
+		if (!allowArray)
+			hr = E_INVALIDARG;
+		if (SUCCEEDED(hr) &&
+			from.val.array.lparray != nullptr &&
+			from.val.array.rows > 0 &&
+			from.val.array.columns > 0)
+		{
+			int nr = from.val.array.rows;
+			int nc = from.val.array.columns;
+			LPXLOPER12 src = from.val.array.lparray;
+
+			SAFEARRAYBOUND bounds[2];
+			bounds[0].cElements = nc;
+			bounds[0].lLbound = 1;
+			bounds[1].cElements = nr;
+			bounds[1].lLbound = 1;
+
+			SAFEARRAY *psa = SafeArrayCreate(VT_VARIANT, 2, bounds);
+			if (psa == nullptr)
+				hr = E_OUTOFMEMORY;
+			if (SUCCEEDED(hr))
+			{
+				VARIANT *dest;
+				hr = SafeArrayAccessData(psa, (void**)&dest);
+				if (SUCCEEDED(hr))
+				{
+					int count = nr*nc;
+					for (int i = 0; i < count; i++)
+					{
+						hr = Copy(dest[i], src[i], false);
+						if (FAILED(hr))
+						{
+							for (int j = 0; j < i; j++)
+								VariantClear(&dest[j]);
+							break;
+						}
+					}
+					SafeArrayUnaccessData(psa);
+					if (SUCCEEDED(hr))
+					{
+						V_VT(&v) = VT_ARRAY | VT_VARIANT;
+						V_ARRAY(&v) = psa;
+					}
+				}
+			}
+		}
+		break;
+	default:
+	case xltypeBigData:
+	case xltypeFlow:
+	case xltypeRef:
+	case xltypeSRef:
+		hr = E_NOTIMPL;
+	}
+	return hr;
+}
+
+// TODO: free memory
+VARIANT ArgumentWrapper<VARIANT>::unwrap(LPXLOPER12 p)
+{
+	VARIANT v;
+	HRESULT hr = Copy(v, *p, true);
+	if (FAILED(hr))
+		throw std::invalid_argument("Cannot convert XLOPER12 to VARIANT.");
+	return v;
+}

@@ -235,6 +235,12 @@ DEFINE_SIMPLE_ARGUMENT_WRAPPER(int, int);
 DEFINE_SIMPLE_ARGUMENT_WRAPPER(double, double);
 DEFINE_SIMPLE_ARGUMENT_WRAPPER(std::wstring, const wchar_t *);
 
+template <> struct ArgumentWrapper<VARIANT>
+{
+	typedef LPXLOPER12 wrapped_type;
+	static VARIANT unwrap(LPXLOPER12 v);
+};
+
 template <typename T> struct ArgumentWrapper<T &> : ArgumentWrapper < T > {};
 template <typename T> struct ArgumentWrapper<T &&> : ArgumentWrapper < T > {};
 template <typename T> struct ArgumentWrapper<T const> : ArgumentWrapper < T > {};

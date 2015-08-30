@@ -39,10 +39,10 @@ double Trace(const VARIANT &v)
 	hr = SafeArrayGetVartype(mat, &vt);
 	if (FAILED(hr))
 		throw std::invalid_argument("unsupported argument");
-	if (vt != VT_R8)
+	if (vt != VT_VARIANT)
 		throw std::invalid_argument("unsupported argument");
 
-	double *data;
+	VARIANT *data;
 	hr = SafeArrayAccessData(mat, (void**)&data);
 	if (FAILED(hr))
 		throw std::invalid_argument("Cannot access data");
@@ -57,7 +57,10 @@ double Trace(const VARIANT &v)
 	double sum = 0.0;
 	for (ULONG i = 0; i < n; i++)
 	{
-		sum += *data;
+		HRESULT hr = VariantChangeType(data, data, 0, VT_R8);
+		if (FAILED(hr))
+			throw std::invalid_argument("Cannot convert to double");
+		sum += V_R8(data);
 		data += (n + 1);
 	}
 	SafeArrayUnaccessData(mat);
@@ -80,8 +83,8 @@ EXPORT_XLL_FUNCTION(Square)
 
 EXPORT_XLL_FUNCTION(ReverseString);
 
-//EXPORT_XLL_FUNCTION(Trace)
-//.Description(L"Returns the sum of the diagonal elements of a square matrix.");
+EXPORT_XLL_FUNCTION(Trace)
+.Description(L"Returns the sum of the diagonal elements of a square matrix.");
 
 BOOL WINAPI DllMain(HANDLE hInstance, ULONG fdwReason, LPVOID lpReserved)
 {
