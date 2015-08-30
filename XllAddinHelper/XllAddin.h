@@ -9,6 +9,8 @@
 #include <array>
 #include <type_traits>
 
+#define XS(s) L##s
+
 // Excel defines a variant-like XLOPER type. We wrap this data type in
 // ExcelVariant to simplify operations.
 #pragma region Excel data types
@@ -276,13 +278,6 @@ template <typename T> struct ReturnValueWrapper<T const volatile> : ReturnValueW
 
 #define EXPORT_UNDECORATED_NAME comment(linker, "/export:" __FUNCTION__ "=" __FUNCDNAME__)
 
-enum class FunctionAttributes
-{
-	Default = 0,
-	Pure = 1,
-	ThreadSafe = 2,
-};
-
 class NameDescriptionPair
 {
 	LPCWSTR m_name;
@@ -345,27 +340,65 @@ struct FunctionInfo
 	LPCWSTR shortcut;
 	LPCWSTR helpTopic;
 
+	bool isPure;
+	bool isThreadSafe;
+
 	FunctionInfo(LPCWSTR typeText, LPCWSTR entryPoint)
 		: typeText(typeText), entryPoint(entryPoint), name(), description(), 
-		  macroType(1), category(), shortcut(), helpTopic()
+		  macroType(1), category(), shortcut(), helpTopic(), isPure(), isThreadSafe()
+	{
+	}
+};
+
+class FunctionInfoBuilder
+{
+	FunctionInfo &_info;
+
+public:
+	FunctionInfoBuilder(FunctionInfo &functionInfo) 
+		: _info(functionInfo)
 	{
 	}
 
-	FunctionInfo& Name(LPCWSTR name)
+	FunctionInfoBuilder& Name(LPCWSTR name)
 	{
-		this->name = name;
+		_info.name = name;
 		return (*this);
 	}
 
-	FunctionInfo& Description(LPCWSTR description)
+	FunctionInfoBuilder& Description(LPCWSTR description)
 	{
-		this->description = description;
+		_info.description = description;
 		return (*this);
 	}
 
-	FunctionInfo& Arg(LPCWSTR name, LPCWSTR description)
+	FunctionInfoBuilder& Arg(LPCWSTR name, LPCWSTR description)
 	{
-		arguments.push_back(NameDescriptionPair(name, description));
+		_info.arguments.push_back(NameDescriptionPair(name, description));
+		return (*this);
+	}
+
+	FunctionInfoBuilder& Category(LPCWSTR category)
+	{
+		_info.category = category;
+		return (*this);
+	}
+
+	FunctionInfoBuilder& Pure()
+	{
+		_info.isPure = true;
+		return (*this);
+	}
+
+	FunctionInfoBuilder& Volatile()
+	{
+		_info.isPure = false;
+		return (*this);
+	}
+
+	FunctionInfoBuilder& ThreadSafe()
+	{
+		_info.isThreadSafe = true;
 		return (*this);
 	}
 };
@@ -441,7 +474,7 @@ public:
 			sprintf_s(m_errorMessage, "xll error %d", m_errorCode);
 	}
 
-	virtual const char* what() const override
+	const char* what() const override
 	{
 		const char *msg = GetKnownErrorMessage(m_errorCode);
 		return msg? msg : m_errorMessage;
@@ -457,10 +490,10 @@ public:
 		return s_functions;
 	}
 
-	static FunctionInfo& AddFunction(FunctionInfo &f)
+	static FunctionInfoBuilder AddFunction(FunctionInfo &f)
 	{
 		registry().push_back(f);
-		return registry().back();
+		return FunctionInfoBuilder(registry().back());
 	}
 };
 
@@ -491,7 +524,7 @@ struct XLWrapper < Func, func, TRet(TArgs...) >
 
 #define EXPORT_XLL_FUNCTION(f) \
 	EXPORT_DLL_FUNCTION(XL##f, (XLWrapper<decltype(f), f, decltype(f)>::Call)) \
-	static FunctionInfo XLFun_##f = AddinRegistrar::AddFunction(\
+	static FunctionInfoBuilder XLFun_##f = AddinRegistrar::AddFunction(\
 		FunctionInfoFactory<decltype(f)>::Create(L"XL" L#f)).Name(L#f)
 
 //
