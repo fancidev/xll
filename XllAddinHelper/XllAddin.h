@@ -19,6 +19,8 @@ class ExcelRef : public xlref12
 {
 };
 
+void XLOPER12_Clear(LPXLOPER12 p);
+
 // Wraps an XLOPER12 and automatically releases memory on destruction.
 // Use this class when you pass arguments to an Excel function.
 class ExcelVariant : public XLOPER12
@@ -30,13 +32,20 @@ class ExcelVariant : public XLOPER12
 		return v;
 	}
 
+	static ExcelVariant MakeError(int err)
+	{
+		ExcelVariant v;
+		v.xltype = xltypeErr;
+		v.val.err = err;
+		return v;
+	}
+
 	static void Copy(XLOPER12& to, const XLOPER12 &from);
 
 public:
-	static void Erase(XLOPER12 &x);
-
 	static const ExcelVariant Empty;
 	static const ExcelVariant Missing;
+	static const ExcelVariant ErrValue;
 
 	ExcelVariant()
 	{
@@ -158,7 +167,7 @@ public:
 
 	~ExcelVariant()
 	{
-		Erase(*this);
+		XLOPER12_Clear(this);
 	}
 
 	// Returns the content of this object in a heap-allocated XLOPER12 suitable
@@ -247,6 +256,7 @@ template <typename T> struct ArgumentWrapper<T const> : ArgumentWrapper < T > {}
 template <typename T> struct ArgumentWrapper<T volatile> : ArgumentWrapper < T > {};
 template <typename T> struct ArgumentWrapper<T const volatile> : ArgumentWrapper < T > {};
 
+#if 0
 template <typename T>
 struct ReturnValueWrapper
 {
@@ -279,6 +289,7 @@ template <> struct ReturnValueWrapper < std::wstring >
 template <typename T> struct ReturnValueWrapper<T const> : ReturnValueWrapper < T >{};
 template <typename T> struct ReturnValueWrapper<T volatile> : ReturnValueWrapper < T >{};
 template <typename T> struct ReturnValueWrapper<T const volatile> : ReturnValueWrapper < T >{};
+#endif
 
 #pragma endregion
 
@@ -418,7 +429,7 @@ struct FunctionInfoFactory<TRet(TArgs...)>
 	{
 		const int NumArgs = sizeof...(TArgs);
 		std::array<LPCWSTR, NumArgs + 1> texts = {
-			GetTypeText<typename ReturnValueWrapper<TRet>::wrapped_type>(),
+			L"Q", // LPXLOPER12
 			GetTypeText<typename ArgumentWrapper<TArgs>::wrapped_type>()...
 		};
 		std::wstring s;
@@ -503,6 +514,28 @@ public:
 	}
 };
 
+#ifndef XLL_SUPPORT_THREAD_LOCAL
+#if WINVER >= _WIN32_WINNT_VISTA
+#define XLL_SUPPORT_THREAD_LOCAL 1
+#else
+#define XLL_SUPPORT_THREAD_LOCAL 0
+#endif
+#endif
+
+#if XLL_SUPPORT_THREAD_LOCAL
+__declspec(thread) extern XLOPER12 xllReturnValue;
+inline LPXLOPER12 getReturnValue() { return &xllReturnValue; }
+#else
+inline LPXLOPER12 getReturnValue() {
+	LPXLOPER12 p = (LPXLOPER12)malloc(sizeof(XLOPER12));
+	if (p == nullptr)
+		throw std::bad_alloc();
+	return p;
+}
+#endif
+
+//extern const XLOPER12 xllErrorValue;
+
 #if !defined(_WIN64)
 // On 32-bit platform, we use naked function to emit a JMP instruction,
 // and export this function. The function must be __cdecl.
@@ -511,11 +544,26 @@ template <typename Func, Func *func, typename> struct XLWrapper;
 template <typename Func, Func *func, typename TRet, typename... TArgs>
 struct XLWrapper < Func, func, TRet(TArgs...) >
 { 
-	static typename ReturnValueWrapper<TRet>::wrapped_type __stdcall
-		Call(typename ArgumentWrapper<TArgs>::wrapped_type... args)
+	static LPXLOPER12 __stdcall Call(typename ArgumentWrapper<TArgs>::wrapped_type... args)
 	{
-		return ReturnValueWrapper<TRet>::wrap(
-			func(ArgumentWrapper<TArgs>::unwrap(args)...));
+		try
+		{
+			ExcelVariant result(func(ArgumentWrapper<TArgs>::unwrap(args)...));
+			LPXLOPER12 pv = getReturnValue();
+			memcpy(pv, &result, sizeof(XLOPER12));
+			memset(&result, 0, sizeof(XLOPER12));
+			// TODO: set the xlbitDLLFree bit
+			return pv;
+		}
+		catch (const std::exception &)
+		{
+			// todo: report exception
+		}
+		catch (...)
+		{
+			// todo: report exception
+		}
+		return const_cast<ExcelVariant*>(&ExcelVariant::ErrValue);
 	}
 };
 

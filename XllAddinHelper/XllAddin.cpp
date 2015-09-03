@@ -1,10 +1,12 @@
 #include <Windows.h>
+#include <cassert>
 #include "XllAddin.h"
 
 #define EXPORT_UNDECORATED_NAME comment(linker, "/export:" __FUNCTION__ "=" __FUNCDNAME__)
 
 const ExcelVariant ExcelVariant::Empty(ExcelVariant::FromType(xltypeNil));
 const ExcelVariant ExcelVariant::Missing(ExcelVariant::FromType(xltypeMissing));
+const ExcelVariant ExcelVariant::ErrValue(ExcelVariant::MakeError(xlerrValue));
 
 double __stdcall MyTestFunc(double x, double y)
 {
@@ -175,31 +177,54 @@ LPXLOPER12 WINAPI xlAddInManagerInfo12(LPXLOPER12 xAction)
 	return 0;
 }
 
+#if XLL_SUPPORT_THREAD_LOCAL
+__declspec(thread) XLOPER12 xllReturnValue;
+#endif
+
 void WINAPI xlAutoFree12(LPXLOPER12 p)
 {
 #pragma EXPORT_UNDECORATED_NAME
 	if (p)
 	{
-		ExcelVariant::Erase(*p);
+#if XLL_SUPPORT_THREAD_LOCAL
+		assert(p == &xllReturnValue);
+		XLOPER12_Clear(p);
+#else
+		XLOPER12_Clear(p);
 		free(p);
+#endif
 	}
 }
 
-void ExcelVariant::Erase(XLOPER12 &x)
+void XLOPER12_Clear(XLOPER12 *p)
 {
-	switch (x.xltype)
+	if (p == nullptr)
+		return;
+
+	switch (p->xltype & ~xlbitDLLFree)
 	{
 	case xltypeStr:
-		free(x.val.str);
+		free(p->val.str);
 		break;
 	case xltypeRef:
-		free(x.val.mref.lpmref);
+		free(p->val.mref.lpmref);
 		break;
 	case xltypeMulti:
-		free(x.val.array.lparray);
+		if (p->val.array.lparray != nullptr)
+		{
+			int nr = p->val.array.rows;
+			int nc = p->val.array.columns;
+			int count = nr*nc;
+			if (nr > 0 && nc > 0 && count > 0)
+			{
+				for (int i = 0; i < count; i++)
+					XLOPER12_Clear(&p->val.array.lparray[i]);
+			}
+			free(p->val.array.lparray);
+		}
 		break;
 	}
-	x.xltype = 0;
+	p->xltype = 0;
 }
 
 void ExcelVariant::Copy(XLOPER12 &to, const XLOPER12 &from)
