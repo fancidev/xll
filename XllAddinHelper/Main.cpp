@@ -67,6 +67,20 @@ double Trace(const VARIANT &v)
 	return sum;
 }
 
+DWORD SlowFunc()
+{
+	Sleep(1000);
+	return GetCurrentThreadId();
+}
+
+EXPORT_XLL_FUNCTION(GetCurrentThreadId)
+.Volatile()
+.ThreadSafe();
+
+EXPORT_XLL_FUNCTION(SlowFunc)
+.Volatile()
+.ThreadSafe();
+
 EXPORT_XLL_FUNCTION(Plus)
 .Description(L"Returns the sum of two numbers.")
 .Arg(L"a", L"first number")
@@ -81,7 +95,8 @@ EXPORT_XLL_FUNCTION(Square)
 .Description(L"Returns the square of a number.")
 .Arg(L"x", L"The number to square");
 
-EXPORT_XLL_FUNCTION(ReverseString);
+EXPORT_XLL_FUNCTION(ReverseString)
+.ThreadSafe();
 
 EXPORT_XLL_FUNCTION(Trace)
 .Description(L"Returns the sum of the diagonal elements of a square matrix.");

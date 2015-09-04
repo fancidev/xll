@@ -21,6 +21,73 @@ class ExcelRef : public xlref12
 
 void XLOPER12_Clear(LPXLOPER12 p);
 
+template <typename T>
+void XLOPER12_Create(LPXLOPER12 pv, const T &value)
+{
+	static_assert(false, "Don't know how to convert the specified type to XLOPER12. "
+						 "Overload XLOPER12_Create() to fix this issue.");
+}
+
+inline void XLOPER12_Create(LPXLOPER12 pv, double value)
+{
+	pv->xltype = xltypeNum;
+	pv->val.num = value;
+}
+
+inline void XLOPER12_Create(LPXLOPER12 pv, unsigned long value)
+{
+	XLOPER12_Create(pv, static_cast<double>(value));
+}
+
+//ExcelVariant(const char *s);
+
+void XLOPER12_Create(LPXLOPER12 pv, const wchar_t *s, size_t len);
+
+inline void XLOPER12_Create(LPXLOPER12 pv, const wchar_t *s)
+{
+	XLOPER12_Create(pv, s, s ? (size_t)lstrlenW(s) : 0);
+}
+
+inline void XLOPER12_Create(LPXLOPER12 pv, const std::wstring &value)
+{
+	XLOPER12_Create(pv, value.c_str(), value.size());
+}
+
+inline void XLOPER12_Create(LPXLOPER12 pv, bool value)
+{
+	pv->xltype = xltypeBool;
+	pv->val.xbool = value;
+}
+
+inline void XLOPER12_Create(LPXLOPER12 pv, int value)
+{
+	pv->xltype = xltypeInt;
+	pv->val.w = value;
+}
+
+// ExcelVariant() ref
+
+// ExcelVariant() err
+
+// ExcelVariant() flow
+
+// ExcelVariant() array
+
+// ExcelVariant() missing
+
+// ExcelVariant() nil
+
+//ExcelVariant(const ExcelRef &ref)
+//{
+//	xltype = xltypeSRef;
+//	val.sref.count = 1;
+//	val.sref.ref = ref;
+//}
+
+
+
+///////////////////////////////
+
 // Wraps an XLOPER12 and automatically releases memory on destruction.
 // Use this class when you pass arguments to an Excel function.
 class ExcelVariant : public XLOPER12
@@ -219,7 +286,7 @@ ExcelVariant ExcelCall(int xlfn, const T&... args)
 // We must "unwrap" these incoming arguments before forwarding the call to
 // the UDF. Likewise, we must "wrap" the return value of the udf to one of
 // the several return types supported by Excel.
-#pragma region Argument and return value marshalling
+#pragma region Argument marshalling
 
 template <typename T> struct fake_dependency : public std::false_type {};
 
@@ -255,41 +322,6 @@ template <typename T> struct ArgumentWrapper<T &&> : ArgumentWrapper < T > {};
 template <typename T> struct ArgumentWrapper<T const> : ArgumentWrapper < T > {};
 template <typename T> struct ArgumentWrapper<T volatile> : ArgumentWrapper < T > {};
 template <typename T> struct ArgumentWrapper<T const volatile> : ArgumentWrapper < T > {};
-
-#if 0
-template <typename T>
-struct ReturnValueWrapper
-{
-	static_assert(fake_dependency<T>::value,
-		"Do not know how to wrap the supplied return value type. "
-		"Specialize xll::ReturnValueWrapper<T> to support it.");
-	// typedef ?? wrapped_type;
-	// static inline wrapped_type wrap(const T &);
-};
-
-#define DEFINE_SIMPLE_RETURN_VALUE_WRAPPER(NativeType) \
-	template <> struct ReturnValueWrapper<NativeType> \
-	{ \
-		typedef NativeType wrapped_type; \
-		static inline wrapped_type wrap(const NativeType &v) { return v; } \
-	};
-
-DEFINE_SIMPLE_RETURN_VALUE_WRAPPER(int);
-DEFINE_SIMPLE_RETURN_VALUE_WRAPPER(double);
-
-template <> struct ReturnValueWrapper < std::wstring >
-{
-	typedef LPXLOPER12 wrapped_type;
-	static inline LPXLOPER12 wrap(const std::wstring &s)
-	{
-		return ExcelVariant(s).detach();
-	}
-};
-
-template <typename T> struct ReturnValueWrapper<T const> : ReturnValueWrapper < T >{};
-template <typename T> struct ReturnValueWrapper<T volatile> : ReturnValueWrapper < T >{};
-template <typename T> struct ReturnValueWrapper<T const volatile> : ReturnValueWrapper < T >{};
-#endif
 
 #pragma endregion
 
@@ -536,11 +568,30 @@ inline LPXLOPER12 getReturnValue() {
 
 //extern const XLOPER12 xllErrorValue;
 
+template <typename Func> struct StripCallingConvention;
+template <typename TRet, typename... TArgs>
+struct StripCallingConvention < TRet __cdecl(TArgs...) >
+{
+	typedef TRet type(TArgs...);
+};
+template <typename TRet, typename... TArgs>
+struct StripCallingConvention < TRet __stdcall(TArgs...) >
+{
+	typedef TRet type(TArgs...);
+};
+template <typename TRet, typename... TArgs>
+struct StripCallingConvention < TRet __fastcall(TArgs...) >
+{
+	typedef TRet type(TArgs...);
+};
+
 #if !defined(_WIN64)
 // On 32-bit platform, we use naked function to emit a JMP instruction,
 // and export this function. The function must be __cdecl.
 
-template <typename Func, Func *func, typename> struct XLWrapper;
+template <typename Func, Func *func, typename = typename StripCallingConvention<Func>::type>
+struct XLWrapper;
+
 template <typename Func, Func *func, typename TRet, typename... TArgs>
 struct XLWrapper < Func, func, TRet(TArgs...) >
 { 
@@ -548,12 +599,9 @@ struct XLWrapper < Func, func, TRet(TArgs...) >
 	{
 		try
 		{
-			ExcelVariant result(func(ArgumentWrapper<TArgs>::unwrap(args)...));
-			LPXLOPER12 pv = getReturnValue();
-			memcpy(pv, &result, sizeof(XLOPER12));
-			memset(&result, 0, sizeof(XLOPER12));
-			// TODO: set the xlbitDLLFree bit
-			return pv;
+			LPXLOPER12 pvRetVal = getReturnValue();
+			XLOPER12_Create(pvRetVal, func(ArgumentWrapper<TArgs>::unwrap(args)...));
+			return pvRetVal;
 		}
 		catch (const std::exception &)
 		{
@@ -577,7 +625,7 @@ struct XLWrapper < Func, func, TRet(TArgs...) >
 #define WRAPPER_TYPE(f) std::remove_pointer<decltype(XLWrapper<decltype(f), f, decltype(f)>::Call)>::type
 
 #define EXPORT_XLL_FUNCTION(f) \
-	EXPORT_DLL_FUNCTION(XL##f, (XLWrapper<decltype(f), f, decltype(f)>::Call)) \
+	EXPORT_DLL_FUNCTION(XL##f, (XLWrapper<decltype(f), f>::Call)) \
 	static FunctionInfoBuilder XLFun_##f = AddinRegistrar::AddFunction(\
 		FunctionInfoFactory<decltype(f)>::Create(L"XL" L#f)).Name(L#f)
 

@@ -41,13 +41,14 @@ static int RegisterFunction(LPXLOPER12 dllName, const FunctionInfo &f)
 	ExcelVariant opers[256];
 	// opers[0] = dllName;
 	opers[1] = f.entryPoint;
-	opers[2] = f.typeText;
+	opers[2] = f.typeText + (f.isPure ? L"" : L"!") + (f.isThreadSafe ? L"$" : L"");
 	opers[3] = f.name;
 	opers[4] = argumentText;
 	opers[5] = f.macroType;
 	opers[6] = f.category;
 	opers[7] = f.shortcut;
 	opers[8] = f.helpTopic;
+	//opers[8] = L"e:\\Dev\\Repos\\Xll\\Test\\A.chm!123";
 	opers[9] = f.description;
 	for (size_t i = 0; i < f.arguments.size(); i++)
 	{
@@ -194,6 +195,28 @@ void WINAPI xlAutoFree12(LPXLOPER12 p)
 		free(p);
 #endif
 	}
+}
+
+void XLOPER12_Create(LPXLOPER12 pv, const wchar_t *s, size_t len)
+{
+	if (s == nullptr)
+	{
+		pv->xltype = xltypeMissing;
+		return;
+	}
+
+	if (len > 32767)
+		throw new std::invalid_argument("input string is too long");
+
+	wchar_t *p = (wchar_t*)malloc(sizeof(wchar_t)*(len + 1));
+	if (p == nullptr)
+		throw std::bad_alloc();
+
+	p[0] = (wchar_t)len;
+	memcpy(&p[1], s, len*sizeof(wchar_t));
+
+	pv->xltype = xltypeStr | xlbitDLLFree;
+	pv->val.str = p;
 }
 
 void XLOPER12_Clear(XLOPER12 *p)
