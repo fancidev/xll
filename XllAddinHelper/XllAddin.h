@@ -317,6 +317,39 @@ template <> struct ArgumentWrapper<VARIANT>
 	static VARIANT unwrap(LPXLOPER12 v);
 };
 
+class SafeArrayWrapper
+{
+private:
+	SAFEARRAY *psa;
+public:
+	SafeArrayWrapper(const SafeArrayWrapper &) = delete;
+	SafeArrayWrapper& operator=(const SafeArrayWrapper &) = delete;
+	SafeArrayWrapper(SafeArrayWrapper &&other)
+	{
+		if (this != &other)
+		{
+			this->psa = other.psa;
+			other.psa = nullptr;
+		}
+	}
+	SafeArrayWrapper(const XLOPER12 *pv);
+	~SafeArrayWrapper() 
+	{
+		if (psa)
+		{
+			SafeArrayDestroy(psa);
+			psa = nullptr;
+		}
+	}
+	operator SAFEARRAY*() { return psa; }
+};
+
+template <> struct ArgumentWrapper < SAFEARRAY* >
+{
+	typedef LPXLOPER12 wrapped_type;
+	static SafeArrayWrapper unwrap(LPXLOPER12 v);
+};
+
 template <typename T> struct ArgumentWrapper<T &> : ArgumentWrapper < T > {};
 template <typename T> struct ArgumentWrapper<T &&> : ArgumentWrapper < T > {};
 template <typename T> struct ArgumentWrapper<T const> : ArgumentWrapper < T > {};
@@ -430,6 +463,12 @@ public:
 	FunctionInfoBuilder& Category(LPCWSTR category)
 	{
 		_info.category = category;
+		return (*this);
+	}
+
+	FunctionInfoBuilder& HelpTopic(LPCWSTR helpTopic)
+	{
+		_info.helpTopic = helpTopic;
 		return (*this);
 	}
 

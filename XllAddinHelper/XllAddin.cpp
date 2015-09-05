@@ -1,5 +1,6 @@
 #include <Windows.h>
 #include <cassert>
+#include <comdef.h>
 #include "XllAddin.h"
 
 #define EXPORT_UNDECORATED_NAME comment(linker, "/export:" __FUNCTION__ "=" __FUNCDNAME__)
@@ -43,7 +44,13 @@ static int RegisterFunction(LPXLOPER12 dllName, const FunctionInfo &f)
 	opers[1] = f.entryPoint;
 	opers[2] = f.typeText + (f.isPure ? L"" : L"!") + (f.isThreadSafe ? L"$" : L"");
 	opers[3] = f.name;
-	opers[4] = argumentText;
+	// BUG: if the function description is given, then even if the UDF takes
+	//      no arguments, Excel still shows a box to let the user input the
+	//      argument. Need to find a way to get rid of the box.
+	if (!argumentText.empty())
+		opers[4] = argumentText;
+	else
+		opers[4] = (wchar_t*)nullptr;
 	opers[5] = f.macroType;
 	opers[6] = f.category;
 	opers[7] = f.shortcut;
@@ -424,6 +431,81 @@ static HRESULT Copy(VARIANT &v, const XLOPER12 &from, bool allowArray)
 	return hr;
 }
 
+HRESULT SafeArrayCopyFrom(_In_ const XLOPER12 *src, _Out_ SAFEARRAY ** ppsa);
+
+HRESULT VariantSet(VARIANTARG *dest, const XLOPER12 *src, bool allowArray)
+{
+	if (dest == nullptr || src == nullptr)
+		return E_POINTER;
+
+	HRESULT hr = S_OK;
+	VariantInit(dest);
+	switch (src->xltype & ~(xlbitDLLFree | xlbitXLFree))
+	{
+	case xltypeNum:
+		V_VT(dest) = VT_R8;
+		V_R8(dest) = src->val.num;
+		break;
+	case xltypeStr:
+		if (src->val.str != nullptr)
+		{
+			BSTR s = SysAllocStringLen(&src->val.str[1], src->val.str[0]);
+			if (s == nullptr)
+			{
+				hr = E_OUTOFMEMORY;
+			}
+			else
+			{
+				V_VT(dest) = VT_BSTR;
+				V_BSTR(dest) = s;
+			}
+		}
+		break;
+	case xltypeBool:
+		V_VT(dest) = VT_BOOL;
+		V_BOOL(dest) = src->val.xbool;
+		break;
+	case xltypeErr:
+		V_VT(dest) = VT_ERROR;
+		V_ERROR(dest) = 0x800A07D0 + src->val.err;
+		break;
+	case xltypeMissing:
+		V_VT(dest) = VT_ERROR;
+		V_ERROR(dest) = 0x80020004;
+		break;
+	case xltypeNil:
+		V_VT(dest) = VT_EMPTY;
+		break;
+	case xltypeInt:
+		V_VT(dest) = VT_I4;
+		V_I4(dest) = src->val.w;
+		break;
+	case xltypeMulti:
+		if (!allowArray)
+		{
+			hr = E_INVALIDARG;
+		}
+		else
+		{
+			SAFEARRAY *psa;
+			hr = SafeArrayCopyFrom(src, &psa);
+			if (SUCCEEDED(hr))
+			{
+				V_VT(dest) = VT_ARRAY | VT_VARIANT;
+				V_ARRAY(dest) = psa;
+			}
+		}
+		break;
+	default:
+	case xltypeBigData:
+	case xltypeFlow:
+	case xltypeRef:
+	case xltypeSRef:
+		hr = E_NOTIMPL;
+	}
+	return hr;
+}
+
 // TODO: free memory
 VARIANT ArgumentWrapper<VARIANT>::unwrap(LPXLOPER12 p)
 {
@@ -432,4 +514,86 @@ VARIANT ArgumentWrapper<VARIANT>::unwrap(LPXLOPER12 p)
 	if (FAILED(hr))
 		throw std::invalid_argument("Cannot convert XLOPER12 to VARIANT.");
 	return v;
+}
+
+HRESULT SafeArrayCopyFrom(_In_ const XLOPER12 *src, _Out_ SAFEARRAY ** ppsa)
+{
+	if (ppsa == nullptr)
+		return E_POINTER;
+	if (src == nullptr)
+		return E_INVALIDARG;
+
+	*ppsa = nullptr;
+
+	int nr, nc;
+	switch (src->xltype & ~(xlbitDLLFree | xlbitXLFree))
+	{
+	case xltypeMissing:
+	case xltypeNil:
+		return S_OK;
+	case xltypeMulti:
+		nr = src->val.array.rows;
+		nc = src->val.array.columns;
+		src = src->val.array.lparray;
+		break;
+	default:
+		nr = 1;
+		nc = 1;
+		break;
+	}
+
+	if (nr < 0 || nr > 0x100000 || nc < 0 || nc > 0x10000)
+		return E_INVALIDARG;
+	if (nr != 0 && nc != 0 && src == nullptr)
+		return E_INVALIDARG;
+
+	SAFEARRAYBOUND bounds[2];
+	bounds[0].cElements = nr;
+	bounds[0].lLbound = 1;
+	bounds[1].cElements = nc;
+	bounds[1].lLbound = 1;
+
+	SAFEARRAY *psa = SafeArrayCreate(VT_VARIANT, 2, bounds);
+	if (psa == nullptr)
+		return E_OUTOFMEMORY;
+
+	*ppsa = psa;
+	if (nr == 0 || nc == 0)
+		return S_OK;
+
+	VARIANT *dest;
+	HRESULT hr = SafeArrayAccessData(psa, (void**)&dest);
+	if (SUCCEEDED(hr))
+	{
+		int count = nr*nc;
+		for (int i = 0; i < count; i++)
+		{
+			hr = VariantSet(&dest[i], &src[i], false);
+			if (FAILED(hr))
+			{
+				for (int j = 0; j < i; j++)
+					VariantClear(&dest[j]);
+				break;
+			}
+		}
+		SafeArrayUnaccessData(psa);
+	}
+	if (FAILED(hr))
+	{
+		SafeArrayDestroy(psa);
+		*ppsa = nullptr;
+	}
+	return hr;
+}
+
+SafeArrayWrapper::SafeArrayWrapper(const XLOPER12 *pv)
+{
+	HRESULT hr = SafeArrayCopyFrom(pv, &psa);
+	if (FAILED(hr))
+		throw _com_error(hr);
+}
+
+SafeArrayWrapper ArgumentWrapper<SAFEARRAY*>::unwrap(LPXLOPER12 pv)
+{
+	return SafeArrayWrapper(pv);
 }

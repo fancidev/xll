@@ -20,52 +20,7 @@ double Square(double x)
 	return x * x;
 }
 
-std::wstring ReverseString(const std::wstring &s)
-{
-	return std::wstring(s.crbegin(), s.crend());
-}
 
-double Trace(const VARIANT &v)
-{
-	if ((v.vt & VT_ARRAY) == 0)
-		throw std::invalid_argument("argument must be a matrix");
-
-	SAFEARRAY *mat = v.parray;
-	if (SafeArrayGetDim(mat) != 2)
-		throw std::invalid_argument("argument must be a matrix");
-
-	HRESULT hr;
-	VARTYPE vt;
-	hr = SafeArrayGetVartype(mat, &vt);
-	if (FAILED(hr))
-		throw std::invalid_argument("unsupported argument");
-	if (vt != VT_VARIANT)
-		throw std::invalid_argument("unsupported argument");
-
-	VARIANT *data;
-	hr = SafeArrayAccessData(mat, (void**)&data);
-	if (FAILED(hr))
-		throw std::invalid_argument("Cannot access data");
-
-	if (mat->rgsabound[0].cElements != mat->rgsabound[1].cElements)
-	{
-		SafeArrayUnaccessData(mat);
-		throw std::invalid_argument("Only supports square matrix.");
-	}
-
-	ULONG n = mat->rgsabound[0].cElements;
-	double sum = 0.0;
-	for (ULONG i = 0; i < n; i++)
-	{
-		HRESULT hr = VariantChangeType(data, data, 0, VT_R8);
-		if (FAILED(hr))
-			throw std::invalid_argument("Cannot convert to double");
-		sum += V_R8(data);
-		data += (n + 1);
-	}
-	SafeArrayUnaccessData(mat);
-	return sum;
-}
 
 DWORD SlowFunc()
 {
@@ -75,7 +30,9 @@ DWORD SlowFunc()
 
 EXPORT_XLL_FUNCTION(GetCurrentThreadId)
 .Volatile()
-.ThreadSafe();
+.ThreadSafe()
+.Description(L"Returns the id of the thread that is evaluating this function.")
+.HelpTopic(L"https://msdn.microsoft.com/en-us/library/windows/desktop/ms683183(v=vs.85).aspx!0");
 
 EXPORT_XLL_FUNCTION(SlowFunc)
 .Volatile()
@@ -94,12 +51,6 @@ EXPORT_XLL_FUNCTION(Minus)
 EXPORT_XLL_FUNCTION(Square)
 .Description(L"Returns the square of a number.")
 .Arg(L"x", L"The number to square");
-
-EXPORT_XLL_FUNCTION(ReverseString)
-.ThreadSafe();
-
-EXPORT_XLL_FUNCTION(Trace)
-.Description(L"Returns the sum of the diagonal elements of a square matrix.");
 
 BOOL WINAPI DllMain(HANDLE hInstance, ULONG fdwReason, LPVOID lpReserved)
 {

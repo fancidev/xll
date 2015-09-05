@@ -70,7 +70,9 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="ArrayExample.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="StringExample.cpp" />
     <ClCompile Include="XLCALL.CPP" />
     <ClCompile Include="XllAddin.cpp" />
   </ItemGroup>
