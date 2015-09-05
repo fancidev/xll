@@ -4,13 +4,24 @@
 // This file demonstrates how to take array arguments from and return
 // array to Excel. 
 //
-// The following types are supported as arguments and return value:
+// The following types are supported as arguments:
 //
 //   SAFEARRAY *
 //
-// (scalar, vector, matrix)
+// An argument passed from Excel is always converted to a two-dimensional
+// SAFEARRAY with elements of type VARIANT. If a scalar (which may be
+// empty) is passed from Excel, it is converted to a 1-by-1 array. If a
+// missing value is passed (i.e. when a parameter is not specified), it
+// is converted to a 0-by-0 array.
 //
-// (column major, row major)
+// The lower bound of both dimensions is always set to 1.
+//
+// When the array contains more than one element, the elements are stored
+// in row-major order. Specifically,
+//
+//   1, The size of the first dimension is equal to the number of rows;
+//      the size of the second dimension is equal to the number of columns.
+//   2, Elements in the same row are stored in contiguous memory.
 //
 // (fortran array)
 //
@@ -20,48 +31,107 @@
 #include "XllAddin.h"
 #include <cassert>
 #include <comdef.h>
+#include <comutil.h>
 
-double Trace(SAFEARRAY *mat)
+// Helper class to access a two-dimensional SAFEARRAY with element type
+// VARIANT. The wrapper always creates such an array when the UDF expects
+// an argument of type SAFEARRAY*.
+class VariantMatrixAccessor
 {
-	if (mat == nullptr)
-		return 0.0;
-
-	assert(SafeArrayGetDim(mat) == 2);
-
-	HRESULT hr;
-	VARTYPE vt;
-	hr = SafeArrayGetVartype(mat, &vt);
-	if (FAILED(hr))
-		throw std::invalid_argument("unsupported argument");
-	if (vt != VT_VARIANT)
-		throw std::invalid_argument("unsupported argument");
-
-	VARIANT *data;
-	hr = SafeArrayAccessData(mat, (void**)&data);
-	if (FAILED(hr))
-		throw std::invalid_argument("Cannot access data");
-
-	if (mat->rgsabound[0].cElements != mat->rgsabound[1].cElements)
+	SAFEARRAY *m_psa;
+	VARIANT *m_data;
+public:
+	explicit VariantMatrixAccessor(SAFEARRAY *psa)
 	{
-		SafeArrayUnaccessData(mat);
-		throw std::invalid_argument("Only supports square matrix.");
-	}
+		assert(psa != nullptr);
+		assert(SafeArrayGetDim(psa) == 2);
 
-	ULONG n = mat->rgsabound[0].cElements;
-	double sum = 0.0;
-	for (ULONG i = 0; i < n; i++)
-	{
-		VARIANT v;
-		VariantInit(&v);
-		HRESULT hr = VariantChangeType(&v, data, 0, VT_R8);
+		VARTYPE vt;
+		HRESULT hr = SafeArrayGetVartype(psa, &vt);
 		if (FAILED(hr))
-			throw std::invalid_argument("Cannot convert to double");
-		sum += V_R8(&v);
-		data += (n + 1);
+			throw _com_error(hr);
+		assert(vt == VT_VARIANT);
+
+		VARIANT *data;
+		hr = SafeArrayAccessData(psa, (void**)&data);
+		if (FAILED(hr))
+			throw std::invalid_argument("Cannot access data");
+
+		m_psa = psa;
+		m_data = data;
 	}
-	SafeArrayUnaccessData(mat);
+
+	~VariantMatrixAccessor()
+	{
+		if (m_psa != nullptr)
+		{
+			SafeArrayUnaccessData(m_psa);
+			m_data = nullptr;
+			m_psa = nullptr;
+		}
+	}
+
+	size_t rows() const { return m_psa->rgsabound[0].cElements; }
+
+	size_t columns() const { return m_psa->rgsabound[1].cElements; }
+
+	size_t size() const { return rows()*columns(); }
+
+	VARIANT& operator[](size_t index)
+	{
+		return m_data[index];
+	}
+
+	VARIANT& operator()(size_t row, size_t column) // zero-based
+	{
+		return m_data[row*columns() + column];
+	}
+};
+
+template <typename T> T variant_cast(const VARIANT &);
+
+template <> double variant_cast<double>(const VARIANT &v)
+{
+	VARIANT result;
+	VariantInit(&result);
+	HRESULT hr = VariantChangeType(&result, &v, 0, VT_R8);
+	if (FAILED(hr))
+		throw std::bad_cast();
+	return V_R8(&result);
+}
+
+double Trace(SAFEARRAY *matrix)
+{
+	VariantMatrixAccessor mat(matrix);
+	if (mat.rows() != mat.columns())
+		throw std::invalid_argument("Only supports square matrix.");
+
+	double sum = 0.0;
+	size_t n = mat.rows();
+	for (size_t i = 0; i < n; i++)
+	{
+		sum += variant_cast<double>(mat(i, i));
+	}
 	return sum;
 }
 
 EXPORT_XLL_FUNCTION(Trace)
 .Description(L"Returns the sum of the diagonal elements of a square matrix.");
+
+double PartialSum(SAFEARRAY *matrix, int count)
+{
+	if (count < 0)
+		throw std::invalid_argument("Count must be greater than or equal to zero.");
+
+	VariantMatrixAccessor mat(matrix);
+
+	size_t n = mat.size();
+	double sum = 0.0;
+	for (size_t i = 0; i < n && i < (size_t)count; i++)
+	{
+		sum += variant_cast<double>(mat[i]);
+	}
+	return sum;
+}
+
+EXPORT_XLL_FUNCTION(PartialSum);

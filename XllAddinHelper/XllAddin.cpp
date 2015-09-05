@@ -529,13 +529,15 @@ HRESULT SafeArrayCopyFrom(_In_ const XLOPER12 *src, _Out_ SAFEARRAY ** ppsa)
 	switch (src->xltype & ~(xlbitDLLFree | xlbitXLFree))
 	{
 	case xltypeMissing:
-	case xltypeNil:
-		return S_OK;
+		nr = 0;
+		nc = 0;
+		break;
 	case xltypeMulti:
 		nr = src->val.array.rows;
 		nc = src->val.array.columns;
 		src = src->val.array.lparray;
 		break;
+	case xltypeNil:
 	default:
 		nr = 1;
 		nc = 1;
