@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
 VisualStudioVersion = 12.0.31101.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XllAddinHelper", "XllAddinHelper\XllAddinHelper.vcxproj", "{722B3CAA-5D3A-41EC-B160-49699B626876}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XllConnector", "XllConnector\XllConnector.vcxproj", "{C23D6561-A5B4-413A-B14B-48107DD823AE}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "XllExamples", "XllExamples\XllExamples.vcxproj", "{AE82DBB1-A697-44BC-B1F3-8DFCBD28138C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,10 +13,14 @@ Global
 		Release|Win32 = Release|Win32
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{722B3CAA-5D3A-41EC-B160-49699B626876}.Debug|Win32.ActiveCfg = Debug|Win32
-		{722B3CAA-5D3A-41EC-B160-49699B626876}.Debug|Win32.Build.0 = Debug|Win32
-		{722B3CAA-5D3A-41EC-B160-49699B626876}.Release|Win32.ActiveCfg = Release|Win32
-		{722B3CAA-5D3A-41EC-B160-49699B626876}.Release|Win32.Build.0 = Release|Win32
+		{C23D6561-A5B4-413A-B14B-48107DD823AE}.Debug|Win32.ActiveCfg = Debug|Win32
+		{C23D6561-A5B4-413A-B14B-48107DD823AE}.Debug|Win32.Build.0 = Debug|Win32
+		{C23D6561-A5B4-413A-B14B-48107DD823AE}.Release|Win32.ActiveCfg = Release|Win32
+		{C23D6561-A5B4-413A-B14B-48107DD823AE}.Release|Win32.Build.0 = Release|Win32
+		{AE82DBB1-A697-44BC-B1F3-8DFCBD28138C}.Debug|Win32.ActiveCfg = Debug|Win32
+		{AE82DBB1-A697-44BC-B1F3-8DFCBD28138C}.Debug|Win32.Build.0 = Debug|Win32
+		{AE82DBB1-A697-44BC-B1F3-8DFCBD28138C}.Release|Win32.ActiveCfg = Release|Win32
+		{AE82DBB1-A697-44BC-B1F3-8DFCBD28138C}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
