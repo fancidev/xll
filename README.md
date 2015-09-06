@@ -1,6 +1,6 @@
-# xll
+# XLL Connector
 
-This project makes it extremely easy to make existing C++ functions available for use in Excel spreadsheets. All you need to do is to add two source files and two header files to your project, and then add a one-liner to export each existing C++ function. A minimal working example is as simple as follows:
+XLL Connector is a modern C++ library that makes existing functions available for use in Excel spreadsheets. All you need to do is to add one line for each function you want to export to Excel. A minimal working example is as simple as follows:
 
 ```c++
 #include "XllAddin.h"
@@ -18,23 +18,61 @@ BOOL WINAPI DllMain(HANDLE hInstance, ULONG fdwReason, LPVOID lpReserved)
 }
 ```
 
-## Introduction
+## Quick Start
 
-Excel supports calling user-defined functions (UDFs) defined in a dll. However, some boilerplate code is needed to register the UDFs and to marshal parameters and return values. There are several ways to do this:
+The following assumes you have already built a DLL that contains functions you want to make available for use in Excel. Follow four simple steps to make this happen:
+1. Build the XLL Connector static library
+2. Link the static library into your DLL
+3. Mark the functions you want to export
+4. Test the XLL in Excel
 
-* Manually write the necessary boilerplate code. Advantage: full control. Drawback: tedious and error prone.
+### Building XLL Connector
 
-* Use an external script to generate the boilerplate code as a pre-build step. This is the approach taken by XLW (http://xlw.sourceforge.net/). Advantage: flexible, can make use of comments, integrate with documentation, etc. Drawback: need to format source code according to generator, not transparent, more involved set-up.
+1. Start Visual Studio 2013 or later. This is required because XLL Connector relies on C++11 features to ensure type safety.
+2. Download the source code from github. The source code contains two projects. The XllConnector project is the actual library. XllExamples.dll is a sample DLL that you can load into Excel to see it in action.
+2. Build the solution XLLConnector.sln. This produces XllConnector.lib in the output directory. 
 
-* Use C++ magic to generate the boilerplate code. This is the approach taken by the Excel xll add-in library (http://xll.codeplex.com/). Advantage: simple and transparent. Disadvantage: somewhat verbose.
+### Linking XLL Connector 
 
-* For .NET programs, exposing the functions are much easier because its reflection support. See for example Excel-DNA (http://excel-dna.net/). Advantage: almost seemless integration. Disadvantage: only supports .NET; can be a mess when mixing .NET 2.0 and .NET 4.0 assemblies.
+The static library, XllConnector.lib, must be linked into your DLL to make it available to Excel. There are two alternatives:
 
-This project provides a simple way to generate such boilerplate code using C++ templates. It aims to be as simple to set up and use as possible. Just 4 files need to be added to your existing project, and just a one-liner is needed to expose each of your existing functions. Nothing in your existing source file has to be changed. This makes it particularly suitable for quick starts where it does not make much sense to spend much effort in maintaining the XLL interface.
+* To use XllConnector as a standalone library, add it to the "Additional Dependencies" list in the DLL's linker options.
+* To customize XllConnector, add the XllConnector project into your solution, and add it into the "Reference" section of the DLL project.
 
-## Design
+### Marking Functions to Export
 
-(to be written)
+You don't need to export your functions or change any existing code. Just add one line (in a source file) for each function you want to expose to Excel. Suppose you have written a function `Plus` with the following signature:
+```
+double Plus(double, double);
+```
+To expose this function to Excel, simply add the following line:
+```c++
+EXPORT_XLL_FUNCTION(Plus);
+```
+This automatically generates and exports a wrapper function named `XLPlus` that interfaces with Excel.
+
+You can provide more information about the UDF by the following:
+```c++
+EXPORT_XLL_FUNCTION(Plus)
+  .Description(L"Returns the sum of two numbers.")
+  .Arg(L"a", L"first number")
+  .Arg(L"b", L"second number")
+  .ThreadSafe();
+```
+
+### Testing the XLL in Excel
+
+To load the XLL into Excel automatically when you run the project, do the following:
+
+1. Change your Debug settings to launch Excel with the XLL.
+2. Hit Ctrl+F5 to run the project.
+3. Excel now starts. Create a new workbook. Enter a formula that uses your UDF.
+
+To debug the XLL, do the following:
+
+1. Set a breakpoint in your UDF.
+2. Hit F5. If Visual C++ asks you whether to proceed without loading the symbols for EXCEL.EXE, choose Yes.
+3. Excel now starts. Create a new workbook. Enter a formula that uses your UDF. When the formula is evaluated, your breakpoint will be triggered and you can debug it.
 
 ## Limitations
 
@@ -48,4 +86,4 @@ Being a one-man project, there are a few limitations:
 
 ## License
 
-This project uses Apache License V2. See the LICENSE file for details.
+This project uses Apache License V2. See the [LICENSE](LICENSE) for details.
