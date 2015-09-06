@@ -3,6 +3,12 @@
 #include <comdef.h>
 #include "XllAddin.h"
 
+// http://blogs.msdn.com/b/oldnewthing/archive/2014/03/21/10509670.aspx
+// The DLL that links to this LIB must reference some symbol within this
+// file to make this OBJ file into the final image. Otherwise the OBJ
+// file will not be included and the xlAuto*() functions will not be
+// exported, and the XLL will not work.
+
 #define EXPORT_UNDECORATED_NAME comment(linker, "/export:" __FUNCTION__ "=" __FUNCDNAME__)
 
 const ExcelVariant ExcelVariant::Empty(ExcelVariant::FromType(xltypeNil));
