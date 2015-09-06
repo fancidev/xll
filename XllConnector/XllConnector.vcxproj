@@ -64,12 +64,21 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Addin.cpp" />
+    <ClCompile Include="ArgumentWrapper.cpp" />
+    <ClCompile Include="ExcelVariant.cpp" />
+    <ClCompile Include="Invoke.cpp" />
     <ClCompile Include="XLCALL.CPP" />
-    <ClCompile Include="XllAddin.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Addin.h" />
+    <ClInclude Include="ArgumentWrapper.h" />
+    <ClInclude Include="ExcelVariant.h" />
+    <ClInclude Include="FunctionInfo.h" />
+    <ClInclude Include="Invoke.h" />
     <ClInclude Include="XLCALL.H" />
     <ClInclude Include="XllAddin.h" />
+    <ClInclude Include="xlldef.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

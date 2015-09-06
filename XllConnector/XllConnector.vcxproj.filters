@@ -18,7 +18,16 @@
     <ClCompile Include="XLCALL.CPP">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="XllAddin.cpp">
+    <ClCompile Include="Invoke.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Addin.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ExcelVariant.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ArgumentWrapper.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -27,6 +36,24 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="XllAddin.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Invoke.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="xlldef.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="FunctionInfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Addin.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ExcelVariant.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ArgumentWrapper.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

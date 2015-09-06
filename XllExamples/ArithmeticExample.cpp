@@ -26,7 +26,7 @@ EXPORT_XLL_FUNCTION(Plus)
 .Arg(L"b", L"second number");
 
 EXPORT_XLL_FUNCTION(Minus)
-.Category(XS("Test Functions"))
+.Category(L"Test Functions")
 .Pure()
 .ThreadSafe();
 
