@@ -65,7 +65,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Addin.cpp" />
-    <ClCompile Include="ArgumentWrapper.cpp" />
+    <ClCompile Include="Conversion.cpp" />
     <ClCompile Include="ExcelVariant.cpp" />
     <ClCompile Include="Invoke.cpp" />
     <ClCompile Include="XLCALL.CPP" />
@@ -73,6 +73,7 @@
   <ItemGroup>
     <ClInclude Include="Addin.h" />
     <ClInclude Include="ArgumentWrapper.h" />
+    <ClInclude Include="Conversion.h" />
     <ClInclude Include="ExcelVariant.h" />
     <ClInclude Include="FunctionInfo.h" />
     <ClInclude Include="Invoke.h" />

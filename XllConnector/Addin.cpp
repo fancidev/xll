@@ -1,3 +1,6 @@
+////////////////////////////////////////////////////////////////////////////
+// Addin.h -- book keeping of exported functions and manages registration
+
 #include "xlldef.h"
 #include "FunctionInfo.h"
 #include "ExcelVariant.h"

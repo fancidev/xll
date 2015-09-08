@@ -2,80 +2,89 @@
 
 #include "xlldef.h"
 #include <string>
+#include "Conversion.h"
 
-namespace XLL_NAMESPACE
+XLL_BEGIN_NAMEPSACE
+
+// When Excel calls a UDF, it supports passing arguments of type LPXLOPER12
+// as well as several other native types. We call these "wrapped arguments".
+// We must "unwrap" these incoming arguments before forwarding the call to
+// the UDF. Likewise, we must "wrap" the return value of the udf to one of
+// the several return types supported by Excel.
+
+template <typename T> struct fake_dependency : public std::false_type {};
+
+template <typename T>
+struct ArgumentWrapper
 {
-	// When Excel calls a UDF, it supports passing arguments of type LPXLOPER12
-	// as well as several other native types. We call these "wrapped arguments".
-	// We must "unwrap" these incoming arguments before forwarding the call to
-	// the UDF. Likewise, we must "wrap" the return value of the udf to one of
-	// the several return types supported by Excel.
-
-	template <typename T> struct fake_dependency : public std::false_type {};
-
-	template <typename T>
-	struct ArgumentWrapper
-	{
-		static_assert(fake_dependency<T>::value,
-			"Do not know how to wrap the supplied argument type. "
-			"Specialize xll::ArgumentWrapper<T> to support it.");
-		// typedef ?? wrapped_type;
-		// static inline T unwrap(wrapped_type value);
-	};
+	static_assert(fake_dependency<T>::value,
+		"Do not know how to wrap the supplied argument type. "
+		"Specialize xll::ArgumentWrapper<T> to support it.");
+	// typedef ?? wrapped_type;
+	// static inline T unwrap(wrapped_type value);
+};
 
 #define DEFINE_SIMPLE_ARGUMENT_WRAPPER(NativeType, WrappedType) \
-	template <> struct ArgumentWrapper<NativeType> \
-		{ \
-		typedef WrappedType wrapped_type; \
-		static inline NativeType unwrap(WrappedType v) { return v; } \
-		}
+template <> struct ArgumentWrapper<NativeType> \
+	{ \
+	typedef WrappedType wrapped_type; \
+	static inline NativeType unwrap(WrappedType v) { return v; } \
+	}
 
-	DEFINE_SIMPLE_ARGUMENT_WRAPPER(int, int);
-	DEFINE_SIMPLE_ARGUMENT_WRAPPER(double, double);
-	DEFINE_SIMPLE_ARGUMENT_WRAPPER(std::wstring, const wchar_t *);
+DEFINE_SIMPLE_ARGUMENT_WRAPPER(int, int);
+DEFINE_SIMPLE_ARGUMENT_WRAPPER(double, double);
+DEFINE_SIMPLE_ARGUMENT_WRAPPER(std::wstring, const wchar_t *);
 
-	template <> struct ArgumentWrapper < VARIANT >
+template <> struct ArgumentWrapper < VARIANT >
+{
+	typedef LPXLOPER12 wrapped_type;
+	static VARIANT unwrap(LPXLOPER12 v)
 	{
-		typedef LPXLOPER12 wrapped_type;
-		static VARIANT unwrap(LPXLOPER12 v);
-	};
+		// TODO: use a wrapper to free memory
+		return make<VARIANT>(*v);
+	}
+};
 
-	class SafeArrayWrapper
+class SafeArrayWrapper
+{
+private:
+	SAFEARRAY *psa;
+public:
+	SafeArrayWrapper(const SafeArrayWrapper &) = delete;
+	SafeArrayWrapper& operator=(const SafeArrayWrapper &) = delete;
+	SafeArrayWrapper(SafeArrayWrapper &&other)
 	{
-	private:
-		SAFEARRAY *psa;
-	public:
-		SafeArrayWrapper(const SafeArrayWrapper &) = delete;
-		SafeArrayWrapper& operator=(const SafeArrayWrapper &) = delete;
-		SafeArrayWrapper(SafeArrayWrapper &&other)
+		if (this != &other)
 		{
-			if (this != &other)
-			{
-				this->psa = other.psa;
-				other.psa = nullptr;
-			}
+			this->psa = other.psa;
+			other.psa = nullptr;
 		}
-		SafeArrayWrapper(const XLOPER12 *pv);
-		~SafeArrayWrapper()
-		{
-			if (psa)
-			{
-				SafeArrayDestroy(psa);
-				psa = nullptr;
-			}
-		}
-		operator SAFEARRAY*() { return psa; }
-	};
-
-	template <> struct ArgumentWrapper < SAFEARRAY* >
+	}
+	SafeArrayWrapper(const XLOPER12 *pv) : psa(make<SAFEARRAY*>(*pv)){}
+	~SafeArrayWrapper()
 	{
-		typedef LPXLOPER12 wrapped_type;
-		static SafeArrayWrapper unwrap(LPXLOPER12 v);
-	};
+		if (psa)
+		{
+			SafeArrayDestroy(psa);
+			psa = nullptr;
+		}
+	}
+	operator SAFEARRAY*() { return psa; }
+};
 
-	template <typename T> struct ArgumentWrapper<T &> : ArgumentWrapper < T > {};
-	template <typename T> struct ArgumentWrapper<T &&> : ArgumentWrapper < T > {};
-	template <typename T> struct ArgumentWrapper<T const> : ArgumentWrapper < T > {};
-	template <typename T> struct ArgumentWrapper<T volatile> : ArgumentWrapper < T > {};
-	template <typename T> struct ArgumentWrapper<T const volatile> : ArgumentWrapper < T > {};
-}
+template <> struct ArgumentWrapper < SAFEARRAY* >
+{
+	typedef LPXLOPER12 wrapped_type;
+	static SafeArrayWrapper unwrap(LPXLOPER12 v)
+	{
+		return SafeArrayWrapper(v);
+	}
+};
+
+template <typename T> struct ArgumentWrapper<T &> : ArgumentWrapper < T > {};
+template <typename T> struct ArgumentWrapper<T &&> : ArgumentWrapper < T > {};
+template <typename T> struct ArgumentWrapper<T const> : ArgumentWrapper < T > {};
+template <typename T> struct ArgumentWrapper<T volatile> : ArgumentWrapper < T > {};
+template <typename T> struct ArgumentWrapper<T const volatile> : ArgumentWrapper < T > {};
+
+XLL_END_NAMESPACE
