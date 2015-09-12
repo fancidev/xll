@@ -132,10 +132,11 @@ namespace XLL_NAMESPACE
 			return FunctionInfo(s.c_str(), entryPoint);
 		}
 	};
-
+#ifndef _WIN64
 	template <typename TRet, typename... TArgs>
 	struct FunctionInfoFactory<TRet __stdcall(TArgs...)>
 		: public FunctionInfoFactory<TRet(TArgs...)>
 	{
 	};
+#endif
 }

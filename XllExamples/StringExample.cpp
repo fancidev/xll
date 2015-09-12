@@ -59,9 +59,9 @@ EXPORT_XLL_FUNCTION(GetTooLongString).Pure().ThreadSafe();
 //   is to test string marshalling. If marshalled as "C", the maximum
 //   input allowed is 255 bytes; if a longer string is input, Excel returns
 //   #VALUE! directly without calling the function at all.
-size_t MultiByteStrLen(const char *s)
+int MultiByteStrLen(const char *s)
 {
-	return strlen(s);
+	return static_cast<int>(strlen(s));
 }
 
 EXPORT_XLL_FUNCTION(MultiByteStrLen);

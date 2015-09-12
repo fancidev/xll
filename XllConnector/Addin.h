@@ -57,6 +57,7 @@ struct StripCallingConvention < TRet __cdecl(TArgs...) >
 {
 	typedef TRet type(TArgs...);
 };
+#ifndef _WIN64
 template <typename TRet, typename... TArgs>
 struct StripCallingConvention < TRet __stdcall(TArgs...) >
 {
@@ -67,6 +68,13 @@ struct StripCallingConvention < TRet __fastcall(TArgs...) >
 {
 	typedef TRet type(TArgs...);
 };
+#else
+template <typename TRet, typename... TArgs>
+struct StripCallingConvention < TRet __vectorcall(TArgs...) >
+{
+	typedef TRet type(TArgs...);
+};
+#endif
 
 template <typename Func, Func *func, typename TRet, typename... TArgs>
 inline LPXLOPER12 XLWrapperImpl(typename ArgumentMarshaler<TArgs>::WireType... args)

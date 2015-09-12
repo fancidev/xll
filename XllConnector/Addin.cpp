@@ -86,7 +86,7 @@ static int RegisterFunction(LPXLOPER12 dllName, const FunctionInfo &f)
 	if (f.description == nullptr && f.arguments.size() == 0)
 		n = 9;
 	else
-		n = 10 + f.arguments.size();
+		n = 10 + static_cast<int>(f.arguments.size());
 
 	XLOPER12 id;
 	int ret = Excel12v(xlfRegister, &id, n, popers);
