@@ -1,3 +1,6 @@
+////////////////////////////////////////////////////////////////////////////
+// Marshal.h -- template classes to marshal arguments from Excel to UDF
+
 #pragma once
 
 #include "xlldef.h"
@@ -11,66 +14,51 @@
 // and the return value, as well as handling any exception thrown by the
 // UDF.
 //
-// The following diagram illustrates the steps in a call from Excel to
-// a UDF:
+// The following diagram illustrates the marshalling steps performed in
+// a call from Excel to UDF:
 //
 //             +-----------------+                   +-----------------+
-//   Excel     |   XL Arg Type   |                   |   XL Ret Type   |
+//   Excel     |  Wire Arg Type  |                   |  Wire Ret Type  |
 //             +--------+--------+                   +--------+--------+
 //                      |                                     ^
 //                      v                                     |
-//   Marshaler       unwrap                                 wrap
+//   Marshaler       marshal                               marshal
 //                      |                                     ^
 //                      v                                     |
 //             +--------+--------+                   +--------+--------+
-//   UDF       | Native Arg Type | ---> Compute ---> | Native Ret Type |
+//   UDF       |  User Arg Type  | ---> Compute ---> |  User Ret Type  |
 //             +-----------------+                   +-----------------+
 //
 // 
-// When Excel calls a UDF, it supports passing arguments of type LPXLOPER12
-// as well as several other native types. We call these "wrapped arguments".
-// We must "unwrap" these incoming arguments before forwarding the call to
-// the UDF. Likewise, we must "wrap" the return value of the udf to one of
-// the several return types supported by Excel.
+// When Excel calls a UDF, it passes arguments in "wire type", such as
+// LPXLOPER12 and primitive numeric types. XLL Connector "marshals" these
+// arguments into "user type" and pass them to the UDF. This process is
+// implemented by the ArgumentMarshaler<T> template class. You can specialize
+// this struct to provide marshaling support for custom types.
+//
+// When the UDF returns, XLL Connector marshals the return value to
+// LPXLOPER12 and return back to Excel. If an exception is thrown, the
+// wrapper returns #VALUE!.
 //
 
 XLL_BEGIN_NAMEPSACE
 
-// template <typename T> struct fake_dependency : public std::false_type {};
-
-// ArgumentMarshaler<T> -- marshal an argument of native type T from
-// Excel to UDF. The default implementation exposes the argument as
-// LPXLOPER12 and uses make<T>() to convert it. This requires the
-// type cast operator to be provided for that type.
+// ArgumentMarshaler<T> -- marshal an argument of user type T from
+// Excel to UDF. The following members are required:
 //
-// NativeType: the argument type of the UDF
-// StorageType: an intermediary type that is convertible from
-// XLOPER12 and convertible to NativeType. 
-// The purpose of StorageType is to automatically release the
-// intermediary object after the call.
-
-//template <typename NativeType>
-//struct ArgumentMarshaler
-//{
-//	typedef LPXLOPER12 MarshaledType;
-//	static inline const wchar_t * GetTypeText() { return L"Q"; }
-//	static inline NativeType Marshal(MarshaledType arg)
-//	{
-//		return make<NativeType>(*arg);
-//	}
-//};
-
-//#define PACK_TYPE_TEXT(c1, c2) ((int)(unsigned char)(c1) | ((int)(unsigned char)(c2) << 8))
-//#define UNPACK_TYPE_TEXT(x) (char)((x) & 0xFF), (char)(((x)>>8) & 0xFF)
+//   UserType      argument type of the UDF
+//   WireType      type that Excel passes
+//   Marshal       function to marshal the argument
+//   GetTypeText   returns the type text used in registration
+//
+// The default implementation produces a static_assert error. 
 
 template <typename T>
 struct ArgumentMarshaler
 {
-	// typedef T NativeType;
-	// typedef ? MarshaledType;
-	// typedef ? StorageType;
-	// static inline StorageType Marshal(MarshaledType arg);
-	// enum { PackedTypeText = ? };
+	// typedef T UserType;
+	// typedef ? WireType;
+	// static inline ? Marshal(WireType arg);
 	// static inline LPCWSTR GetTypeText() { return L"Q"; }
 	template <typename U> struct always_false : std::false_type {};
 	static_assert(always_false<T>::value,
@@ -78,23 +66,33 @@ struct ArgumentMarshaler
 		"Specialize xll::ArgumentMarshaler<T> to support it.");
 };
 
+// ArgumentMarshalerImpl - generic implementation of ArgumentMarshaler
+//
+// TUserType     native argument type of udf
+// TypeChar1     first character of the wire-type text
+// TypeChar2     second character of the wire-type text, or 0 if none
+// TWireType     wire type, default to the same as user type
+// TAdapterType  return type of the Marshal function. This type must be:
+//               1) implicitly constructible from WireType, and 
+//               2) implicitly convertible to UserType.
+//               The adapter object is used to automatically free any
+//               resources allocated during argument marshalling.
 template <
-	typename TNative, 
+	typename TUserType, 
 	char TypeChar1, 
 	char TypeChar2 = 0, 
-	typename TMarshaled = TNative, 
-	typename TStorage = TNative>
+	typename TWireType = TUserType,
+	typename TAdapterType = TUserType>
 struct ArgumentMarshalerImpl
 {
-	typedef TNative NativeType; // UserType, UdfType, udf_arg_type
-	typedef TMarshaled MarshaledType; // WireType, XllType, xll_arg_type
-	typedef TStorage StorageType;
+	typedef TUserType UserType;
+	typedef TWireType WireType;
 	static inline const wchar_t * GetTypeText()
 	{
 		static const wchar_t typeText[] = { TypeChar1, TypeChar2, 0 };
 		return typeText;
 	}
-	static inline TStorage Marshal(TMarshaled arg)
+	static inline TAdapterType Marshal(WireType arg)
 	{
 		return arg;
 	}
@@ -106,7 +104,7 @@ struct ArgumentMarshalerImpl
 
 IMPLEMENT_ARGUMENT_MARSHALER(double, 'B');
 IMPLEMENT_ARGUMENT_MARSHALER(int, 'J');
-IMPLEMENT_ARGUMENT_MARSHALER(std::wstring, 'C', '%', LPCWSTR, std::wstring);
+IMPLEMENT_ARGUMENT_MARSHALER(std::wstring, 'C', '%', LPCWSTR);
 IMPLEMENT_ARGUMENT_MARSHALER(const std::wstring &, 'C', '%', LPCWSTR, std::wstring);
 IMPLEMENT_ARGUMENT_MARSHALER(const char *, 'C');
 

@@ -78,7 +78,7 @@ struct XLWrapper;
 template <typename Func, Func *func, typename TRet, typename... TArgs>
 struct XLWrapper < Func, func, TRet(TArgs...) >
 {
-	static LPXLOPER12 __stdcall Call(typename ArgumentMarshaler<TArgs>::MarshaledType... args)
+	static LPXLOPER12 __stdcall Call(typename ArgumentMarshaler<TArgs>::WireType... args)
 	{
 		try
 		{

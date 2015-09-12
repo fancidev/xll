@@ -72,7 +72,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Addin.h" />
-    <ClInclude Include="ArgumentWrapper.h" />
+    <ClInclude Include="Marshal.h" />
     <ClInclude Include="Conversion.h" />
     <ClInclude Include="ExcelVariant.h" />
     <ClInclude Include="FunctionInfo.h" />

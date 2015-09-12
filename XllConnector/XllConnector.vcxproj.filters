@@ -53,10 +53,10 @@
     <ClInclude Include="ExcelVariant.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ArgumentWrapper.h">
+    <ClInclude Include="Conversion.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Conversion.h">
+    <ClInclude Include="Marshal.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
