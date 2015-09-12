@@ -30,5 +30,8 @@
     <ClCompile Include="ThreadingExample.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="VariantExample.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

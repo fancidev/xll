@@ -108,8 +108,33 @@ IMPLEMENT_ARGUMENT_MARSHALER(std::wstring, 'C', '%', LPCWSTR);
 IMPLEMENT_ARGUMENT_MARSHALER(const std::wstring &, 'C', '%', LPCWSTR, std::wstring);
 IMPLEMENT_ARGUMENT_MARSHALER(const char *, 'C');
 
-// TODO: use a wrapper to free memory
-IMPLEMENT_ARGUMENT_MARSHALER(VARIANT, 'Q', 0, LPXLOPER12);
+class VariantAdapter
+{
+private:
+	VARIANT m_value;
+public:
+	VariantAdapter(const VariantAdapter &) = delete;
+	VariantAdapter& operator=(const VariantAdapter &) = delete;
+	VariantAdapter(VariantAdapter &&other)
+	{
+		if (this != &other)
+		{
+			memcpy(&this->m_value, &other.m_value, sizeof(VARIANT));
+			memset(&other.m_value, 0, sizeof(VARIANT));
+		}
+	}
+	VariantAdapter(LPXLOPER12 pv)
+	{
+		m_value = make<VARIANT>(*pv);
+	}
+	~VariantAdapter()
+	{
+		VariantClear(&m_value);
+	}
+	operator VARIANT*() { return &m_value; }
+};
+
+IMPLEMENT_ARGUMENT_MARSHALER(VARIANT*, 'Q', 0, LPXLOPER12, VariantAdapter);
 
 class SafeArrayAdapter
 {

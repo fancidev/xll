@@ -71,6 +71,7 @@
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="StringExample.cpp" />
     <ClCompile Include="ThreadingExample.cpp" />
+    <ClCompile Include="VariantExample.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\XllConnector\XllConnector.vcxproj">
