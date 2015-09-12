@@ -16,8 +16,6 @@
 // 255 bytes is returned, the wrapper throws std::invalid_argument() and
 // returns #VALUE! to Excel.
 //
-// TODO: check whether passed in array can be longer
-//
 // In Excel 2007 and later, strings are unicode-encoded and can contain
 // up to 32,767 characters, not including the nul-terminator. A passed-in
 // argument will never contain more characters. If a string longer than

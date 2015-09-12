@@ -72,6 +72,26 @@ struct StripCallingConvention < TRet __fastcall(TArgs...) >
 // On 32-bit platform, we use naked function to emit a JMP instruction,
 // and export this function. The function must be __cdecl.
 
+template <typename Func, Func *func, typename TRet, typename... TArgs>
+inline LPXLOPER12 XLWrapperImpl(typename ArgumentMarshaler<TArgs>::WireType... args)
+{
+	try
+	{
+		LPXLOPER12 pvRetVal = getReturnValue();
+		*pvRetVal = make<XLOPER12>(func(ArgumentMarshaler<TArgs>::Marshal(args)...));
+		return pvRetVal;
+	}
+	catch (const std::exception &)
+	{
+		// todo: report exception
+	}
+	catch (...)
+	{
+		// todo: report exception
+	}
+	return const_cast<ExcelVariant*>(&ExcelVariant::ErrValue);
+}
+
 template <typename Func, Func *func, typename = typename StripCallingConvention<Func>::type>
 struct XLWrapper;
 
@@ -80,21 +100,7 @@ struct XLWrapper < Func, func, TRet(TArgs...) >
 {
 	static LPXLOPER12 __stdcall Call(typename ArgumentMarshaler<TArgs>::WireType... args)
 	{
-		try
-		{
-			LPXLOPER12 pvRetVal = getReturnValue();
-			*pvRetVal = make<XLOPER12>(func(ArgumentMarshaler<TArgs>::Marshal(args)...));
-			return pvRetVal;
-		}
-		catch (const std::exception &)
-		{
-			// todo: report exception
-		}
-		catch (...)
-		{
-			// todo: report exception
-		}
-		return const_cast<ExcelVariant*>(&ExcelVariant::ErrValue);
+		return XLWrapperImpl<Func, func, TRet, TArgs...>(args...);
 	}
 };
 

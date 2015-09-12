@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////
-// xlldef.h -- defines macros to customize the behavior of this library
+// xlldef.h -- macros that customize the behavior of XLL Connector
 
 #pragma once
 

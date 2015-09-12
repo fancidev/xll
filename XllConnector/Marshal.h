@@ -102,10 +102,22 @@ struct ArgumentMarshalerImpl
 	template <> struct ArgumentMarshaler<UserType> \
 		: ArgumentMarshalerImpl<UserType, __VA_ARGS__> {}
 
+#define IMPLEMENT_ARGUMENT_MARSHALER_AS(UserType, AsUserType) \
+	template <> struct ArgumentMarshaler<UserType> : ArgumentMarshaler<AsUserType> {}
+
+//
+// Primitive type marshalling
+//
+
 IMPLEMENT_ARGUMENT_MARSHALER(double, 'B');
 IMPLEMENT_ARGUMENT_MARSHALER(int, 'J');
+
+//
+// String marshalling
+//
+
 IMPLEMENT_ARGUMENT_MARSHALER(std::wstring, 'C', '%', LPCWSTR);
-IMPLEMENT_ARGUMENT_MARSHALER(const std::wstring &, 'C', '%', LPCWSTR, std::wstring);
+IMPLEMENT_ARGUMENT_MARSHALER_AS(const std::wstring &, std::wstring);
 
 class UnicodeToAnsiAdapter
 {
@@ -151,6 +163,10 @@ public:
 // always marshal a string as wchar_t*.
 IMPLEMENT_ARGUMENT_MARSHALER(const char *, 'C', '%', LPCWSTR, UnicodeToAnsiAdapter);
 
+//
+// VARIANT marshalling
+//
+
 class VariantAdapter
 {
 private:
@@ -178,6 +194,10 @@ public:
 };
 
 IMPLEMENT_ARGUMENT_MARSHALER(VARIANT*, 'Q', 0, LPXLOPER12, VariantAdapter);
+
+//
+// SAFEARRAY marshalling
+//
 
 class SafeArrayAdapter
 {
