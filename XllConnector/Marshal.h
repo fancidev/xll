@@ -106,7 +106,50 @@ IMPLEMENT_ARGUMENT_MARSHALER(double, 'B');
 IMPLEMENT_ARGUMENT_MARSHALER(int, 'J');
 IMPLEMENT_ARGUMENT_MARSHALER(std::wstring, 'C', '%', LPCWSTR);
 IMPLEMENT_ARGUMENT_MARSHALER(const std::wstring &, 'C', '%', LPCWSTR, std::wstring);
-IMPLEMENT_ARGUMENT_MARSHALER(const char *, 'C');
+
+class UnicodeToAnsiAdapter
+{
+	char *m_str;
+public:
+	UnicodeToAnsiAdapter(const wchar_t *s)
+	{
+		int cb = WideCharToMultiByte(CP_ACP, 0, s, -1, nullptr, 0, nullptr, nullptr);
+		if (cb <= 0)
+			throw std::invalid_argument("Input string is not a valid Unicode string.");
+		m_str = (char*)malloc((size_t)cb);
+		if (m_str == nullptr)
+			throw std::bad_alloc();
+		if (WideCharToMultiByte(CP_ACP, 0, s, -1, m_str, cb, nullptr, nullptr) <= 0)
+		{
+			free(m_str);
+			throw std::invalid_argument("Cannot convert input string from Unicode to Ansi.");
+		}
+	}
+	UnicodeToAnsiAdapter(UnicodeToAnsiAdapter&& other)
+	{
+		if (this != &other)
+		{
+			m_str = other.m_str;
+			other.m_str = nullptr;
+		}
+	}
+	UnicodeToAnsiAdapter(const UnicodeToAnsiAdapter &) = delete;
+	UnicodeToAnsiAdapter& operator = (const UnicodeToAnsiAdapter &) = delete;
+	~UnicodeToAnsiAdapter()
+	{
+		if (m_str != nullptr)
+		{
+			free(m_str);
+			m_str = nullptr;
+		}
+	}
+	operator char*() { return m_str; }
+};
+
+// In Excel 2007 and later, if a string argument is declared as char*, then
+// at most 255 bytes can be passed, or #VALUE! is returned. Therefore we 
+// always marshal a string as wchar_t*.
+IMPLEMENT_ARGUMENT_MARSHALER(const char *, 'C', '%', LPCWSTR, UnicodeToAnsiAdapter);
 
 class VariantAdapter
 {
