@@ -68,10 +68,6 @@ struct StripCallingConvention < TRet __fastcall(TArgs...) >
 	typedef TRet type(TArgs...);
 };
 
-#if !defined(_WIN64)
-// On 32-bit platform, we use naked function to emit a JMP instruction,
-// and export this function. The function must be __cdecl.
-
 template <typename Func, Func *func, typename TRet, typename... TArgs>
 inline LPXLOPER12 XLWrapperImpl(typename ArgumentMarshaler<TArgs>::WireType... args)
 {
@@ -95,45 +91,20 @@ inline LPXLOPER12 XLWrapperImpl(typename ArgumentMarshaler<TArgs>::WireType... a
 template <typename Func, Func *func, typename = typename StripCallingConvention<Func>::type>
 struct XLWrapper;
 
-template <typename Func, Func *func, typename TRet, typename... TArgs>
-struct XLWrapper < Func, func, TRet(TArgs...) >
-{
-	static LPXLOPER12 __stdcall Call(typename ArgumentMarshaler<TArgs>::WireType... args)
-	{
-		return XLWrapperImpl<Func, func, TRet, TArgs...>(args...);
-	}
-};
-
 XLL_END_NAMESPACE
 
-#define EXPORT_DLL_FUNCTION(name, implementation) \
-	extern "C" __declspec(naked, dllexport) void name() \
-		{ \
-		static const void *fp = static_cast<const void *>(implementation); \
-		__asm { jmp [fp] } \
-		}
-
 #define EXPORT_XLL_FUNCTION(f) \
-	EXPORT_DLL_FUNCTION(XL##f, (::XLL_NAMESPACE::XLWrapper<decltype(f), f>::Call)) \
-	static ::XLL_NAMESPACE::FunctionInfoBuilder XLFun_##f = ::XLL_NAMESPACE::AddFunction(\
-		::XLL_NAMESPACE::FunctionInfoFactory<decltype(f)>::Create(L"XL" L#f)).Name(L#f)
-
-#else
-	// Code for WIN64. Because naked function and inline assembly is not 
-	// supported, we have to define a macro to export the proper symbol.
-#define EXPOSE_FUNCTION_RENAME(Function, Name) \
-	template <typename> struct XL##Name; \
-	template <typename TRet, typename... TArgs> \
-	struct XL##Name < TRet(TArgs...) > \
+	namespace XLL_NAMESPACE { \
+		template <typename TRet, typename... TArgs> \
+		struct XLWrapper < decltype(f), f, TRet(TArgs...) > \
+		{ \
+			static LPXLOPER12 __stdcall Call(typename ArgumentMarshaler<TArgs>::WireType... args) \
 			{ \
-		static __declspec(dllexport) typename Boxed<TRet>::type __stdcall \
-			Call(typename Boxed<TArgs>::type... args) \
-				{ \
-			__pragma(comment(linker, "/export:XL" #Name "=" __FUNCDNAME__)) \
-			return Function(args...); \
-				} \
-			}; \
-	static auto XL##Name##Temp = XL##Name<decltype(Function)>::Call;
-
-#define EXPOSE_FUNCTION(Function) EXPOSE_FUNCTION_RENAME(Function, Function)
-#endif
+				__pragma(comment(linker, "/export:" "XL" #f "=" __FUNCDNAME__)) \
+				return XLWrapperImpl<decltype(f), f, TRet, TArgs...>(args...); \
+			} \
+		}; \
+		static auto XLWrapper_Call_##f = XLWrapper<decltype(f), f>::Call; \
+	} \
+	static ::XLL_NAMESPACE::FunctionInfoBuilder XLFun_##f = ::XLL_NAMESPACE::AddFunction( \
+		::XLL_NAMESPACE::FunctionInfoFactory<decltype(f)>::Create(L"XL" L#f)).Name(L#f)
