@@ -60,6 +60,9 @@ XLL_BEGIN_NAMEPSACE
 //	}
 //};
 
+//#define PACK_TYPE_TEXT(c1, c2) ((int)(unsigned char)(c1) | ((int)(unsigned char)(c2) << 8))
+//#define UNPACK_TYPE_TEXT(x) (char)((x) & 0xFF), (char)(((x)>>8) & 0xFF)
+
 template <typename T>
 struct ArgumentMarshaler
 {
@@ -67,6 +70,7 @@ struct ArgumentMarshaler
 	// typedef ? MarshaledType;
 	// typedef ? StorageType;
 	// static inline StorageType Marshal(MarshaledType arg);
+	// enum { PackedTypeText = ? };
 	// static inline LPCWSTR GetTypeText() { return L"Q"; }
 	template <typename U> struct always_false : std::false_type {};
 	static_assert(always_false<T>::value,
@@ -74,42 +78,16 @@ struct ArgumentMarshaler
 		"Specialize xll::ArgumentMarshaler<T> to support it.");
 };
 
-template <typename T, typename TStorage = T>
-struct VariantArgumentMarshaler
-{
-	typedef T NativeType;
-	typedef LPXLOPER12 MarshaledType;
-	static inline const wchar_t * GetTypeText() { return L"Q"; }
-	static inline TStorage Marshal(LPXLOPER12 arg)
-	{
-		//return make<TStorage>(*arg);
-		return TStorage(*arg);
-	}
-};
-
-template <typename T, char TypeChar1, char TypeChar2 = 0>
-struct SimpleArgumentMarshaler
-{
-	typedef T NativeType;
-	typedef T UdfType;
-	typedef T MarshaledType;
-	typedef T XllType;
-	static inline const wchar_t * GetTypeText()
-	{
-		static const wchar_t typeText[] = { TypeChar1, TypeChar2, 0 };
-		return typeText;
-	}
-	static inline T Marshal(T arg)
-	{
-		return arg;
-	}
-};
-
-template <typename TNative, typename TMarshaled, typename TStorage, char TypeChar1, char TypeChar2 = 0>
+template <
+	typename TNative, 
+	char TypeChar1, 
+	char TypeChar2 = 0, 
+	typename TMarshaled = TNative, 
+	typename TStorage = TNative>
 struct ArgumentMarshalerImpl
 {
-	typedef TNative NativeType;
-	typedef TMarshaled MarshaledType;
+	typedef TNative NativeType; // UserType, UdfType, udf_arg_type
+	typedef TMarshaled MarshaledType; // WireType, XllType, xll_arg_type
 	typedef TStorage StorageType;
 	static inline const wchar_t * GetTypeText()
 	{
@@ -122,40 +100,27 @@ struct ArgumentMarshalerImpl
 	}
 };
 
-#define DEFINE_SIMPLE_ARGUMENT_MARSHALER(nativeType, marshaledType, typeText) \
-	template <> struct ArgumentMarshaler<nativeType> \
-	{ \
-		typedef marshaledType MarshaledType; \
-		static inline const wchar_t * GetTypeText() { return L#typeText; } \
-		static inline nativeType Marshal(marshaledType v) { return v; } \
-	}
+#define IMPLEMENT_ARGUMENT_MARSHALER(UserType, ...) \
+	template <> struct ArgumentMarshaler<UserType> \
+		: ArgumentMarshalerImpl<UserType, __VA_ARGS__> {}
 
-template <> struct ArgumentMarshaler<double> : SimpleArgumentMarshaler<double, 'B'> {};
-template <> struct ArgumentMarshaler<int> : SimpleArgumentMarshaler<int, 'J'>{};
-template <> struct ArgumentMarshaler<const std::wstring &> 
-	: ArgumentMarshalerImpl < std::wstring, LPCWSTR, std::wstring, 'C', '%' > {};
-template <> struct ArgumentMarshaler<const char *>
-	: ArgumentMarshalerImpl < const char *, const char *, const char *, 'C' > {};
-//DEFINE_SIMPLE_ARGUMENT_WRAPPER(int, int, "J");
-//DEFINE_SIMPLE_ARGUMENT_WRAPPER(double, double, "B");
-//DEFINE_SIMPLE_ARGUMENT_WRAPPER(const char *, const char *, "C");
-//DEFINE_SIMPLE_ARGUMENT_WRAPPER(std::wstring, const wchar_t *, "C%");
+IMPLEMENT_ARGUMENT_MARSHALER(double, 'B');
+IMPLEMENT_ARGUMENT_MARSHALER(int, 'J');
+IMPLEMENT_ARGUMENT_MARSHALER(std::wstring, 'C', '%', LPCWSTR, std::wstring);
+IMPLEMENT_ARGUMENT_MARSHALER(const std::wstring &, 'C', '%', LPCWSTR, std::wstring);
+IMPLEMENT_ARGUMENT_MARSHALER(const char *, 'C');
 
 // TODO: use a wrapper to free memory
-template <> 
-struct ArgumentMarshaler<VARIANT> 
-	: VariantArgumentMarshaler<VARIANT>
-{
-};
+IMPLEMENT_ARGUMENT_MARSHALER(VARIANT, 'Q', 0, LPXLOPER12);
 
-class SafeArrayWrapper
+class SafeArrayAdapter
 {
 private:
 	SAFEARRAY *psa;
 public:
-	SafeArrayWrapper(const SafeArrayWrapper &) = delete;
-	SafeArrayWrapper& operator=(const SafeArrayWrapper &) = delete;
-	SafeArrayWrapper(SafeArrayWrapper &&other)
+	SafeArrayAdapter(const SafeArrayAdapter &) = delete;
+	SafeArrayAdapter& operator=(const SafeArrayAdapter &) = delete;
+	SafeArrayAdapter(SafeArrayAdapter &&other)
 	{
 		if (this != &other)
 		{
@@ -163,8 +128,8 @@ public:
 			other.psa = nullptr;
 		}
 	}
-	SafeArrayWrapper(const XLOPER12 &v) : psa(make<SAFEARRAY*>(v)){}
-	~SafeArrayWrapper()
+	SafeArrayAdapter(LPXLOPER12 pv) : psa(make<SAFEARRAY*>(*pv)){}
+	~SafeArrayAdapter()
 	{
 		if (psa)
 		{
@@ -175,11 +140,7 @@ public:
 	operator SAFEARRAY*() { return psa; }
 };
 
-template <> 
-struct ArgumentMarshaler<SAFEARRAY*> 
-	: VariantArgumentMarshaler<SAFEARRAY*, SafeArrayWrapper>
-{
-};
+IMPLEMENT_ARGUMENT_MARSHALER(SAFEARRAY*, 'Q', 0, LPXLOPER12, SafeArrayAdapter);
 
 //template <typename T> struct ArgumentWrapper<T &> : ArgumentWrapper < T > {};
 //template <typename T> struct ArgumentWrapper<T &&> : ArgumentWrapper < T > {};
