@@ -9,20 +9,24 @@ XLL_BEGIN_NAMEPSACE
 ////////////////////////////////////////////////////////////////////////////
 // Conversions to XLOPER12
 
-template <> XLOPER12 make<XLOPER12>(const XLOPER12 &from)
+HRESULT SetValue(LPXLOPER12 dest, const XLOPER12 &from)
 {
-	XLOPER12 to = from;
+#if _DEBUG
+	if (dest == nullptr)
+		return E_INVALIDARG;
+#endif
 
+	memcpy(dest, &from, sizeof(XLOPER12));
 	switch (from.xltype)
 	{
 	case xltypeStr:
 		if (from.val.str != nullptr)
 		{
 			int len = (unsigned short)from.val.str[0];
-			to.val.str = (wchar_t*)malloc(sizeof(wchar_t)*(len + 1));
-			if (to.val.str == nullptr)
-				throw std::bad_alloc();
-			memcpy(to.val.str, from.val.str, sizeof(wchar_t)*(len + 1));
+			dest->val.str = (wchar_t*)malloc(sizeof(wchar_t)*(len + 1));
+			if (dest->val.str == nullptr)
+				return E_OUTOFMEMORY;
+			memcpy(dest->val.str, from.val.str, sizeof(wchar_t)*(len + 1));
 		}
 		break;
 	case xltypeRef:
@@ -33,18 +37,18 @@ template <> XLOPER12 make<XLOPER12>(const XLOPER12 &from)
 			{
 				LPXLMREF12 p = (LPXLMREF12)malloc(sizeof(XLMREF12));
 				if (p == nullptr)
-					throw std::bad_alloc();
+					return E_OUTOFMEMORY;
 				p->count = (WORD)count;
-				to.val.mref.lpmref = p;
+				dest->val.mref.lpmref = p;
 			}
 			else
 			{
 				LPXLMREF12 p = (LPXLMREF12)malloc(sizeof(XLMREF12) + sizeof(XLREF12)*(count - 1));
 				if (p == nullptr)
-					throw std::bad_alloc();
+					return E_OUTOFMEMORY;
 				p->count = (WORD)count;
 				memcpy(p->reftbl, from.val.mref.lpmref->reftbl, sizeof(XLREF12)*count);
-				to.val.mref.lpmref = p;
+				dest->val.mref.lpmref = p;
 			}
 		}
 		break;
@@ -52,14 +56,20 @@ template <> XLOPER12 make<XLOPER12>(const XLOPER12 &from)
 		if (from.val.array.lparray != nullptr)
 		{
 			int count = from.val.array.rows * from.val.array.columns;
-			LPXLOPER12 p = (LPXLOPER12)malloc(sizeof(XLOPER12)*count); // todo: free if exception
+			LPXLOPER12 p = (LPXLOPER12)malloc(sizeof(XLOPER12)*count);
 			if (p == nullptr)
-				throw std::bad_alloc();
+				return E_OUTOFMEMORY;
+
 			for (int i = 0; i < count; i++)
 			{
-				p[i] = make<XLOPER12>(from.val.array.lparray[i]);
+				HRESULT hr = SetValue(&p[i], from.val.array.lparray[i]);
+				if (FAILED(hr))
+				{
+					free(p);
+					return hr;
+				}
 			}
-			to.val.array.lparray = p;
+			dest->val.array.lparray = p;
 		}
 		break;
 	case xltypeBigData:
@@ -68,86 +78,92 @@ template <> XLOPER12 make<XLOPER12>(const XLOPER12 &from)
 			size_t numBytes = from.val.bigdata.cbData;
 			BYTE *p = (BYTE*)malloc(numBytes);
 			if (p == nullptr)
-				throw std::bad_alloc();
+				return E_OUTOFMEMORY;
 			memcpy(p, from.val.bigdata.h.lpbData, numBytes);
-			to.val.bigdata.h.lpbData = p;
+			dest->val.bigdata.h.lpbData = p;
 		}
 		else
 		{
-			to.xltype = 0;
+			dest->xltype = 0;
 		}
 		break;
 	}
-	return to;
+	return S_OK;
 }
 
-template <> XLOPER12 make<XLOPER12>(double value)
+HRESULT SetValue(LPXLOPER12 dest, double value)
 {
-	XLOPER12 dest;
-	dest.xltype = xltypeNum;
-	dest.val.num = value;
-	return dest;
+#if _DEBUG
+	if (dest == nullptr)
+		return E_POINTER;
+#endif
+	dest->xltype = xltypeNum;
+	dest->val.num = value;
+	return S_OK;
 }
 
-template <> XLOPER12 make<XLOPER12>(bool value)
+HRESULT SetValue(LPXLOPER12 dest, int value)
 {
-	XLOPER12 dest;
-	dest.xltype = xltypeBool;
-	dest.val.xbool = value;
-	return dest;
+#if _DEBUG
+	if (dest == nullptr)
+		return E_POINTER;
+#endif
+	dest->xltype = xltypeInt;
+	dest->val.w = value;
+	return S_OK;
 }
 
-template <> XLOPER12 make<XLOPER12>(int value)
+HRESULT SetValue(LPXLOPER12 dest, unsigned long value)
 {
-	XLOPER12 dest;
-	dest.xltype = xltypeInt;
-	dest.val.w = value;
-	return dest;
+	return SetValue(dest, static_cast<double>(value));
 }
 
-static XLOPER12 make_XLOPER12_from_string(const wchar_t *s, size_t len)
+HRESULT SetValue(LPXLOPER12 dest, bool value)
 {
-	XLOPER12 dest;
+#if _DEBUG
+	if (dest == nullptr)
+		return E_POINTER;
+#endif
+	dest->xltype = xltypeBool;
+	dest->val.xbool = value;
+	return S_OK;
+}
 
+HRESULT SetValue(LPXLOPER12 dest, const wchar_t *s, size_t len)
+{
+#if _DEBUG
+	if (dest == nullptr)
+		return E_POINTER;
+#endif
 	if (s == nullptr)
 	{
-		dest.xltype = xltypeMissing;
-		return dest;
+		dest->xltype = xltypeMissing;
+		return S_OK;
 	}
 
-	if (len > 32767)
-		throw new std::invalid_argument("input string is too long");
+	if (len > 32767u)
+		return E_INVALIDARG;
 
 	wchar_t *p = (wchar_t*)malloc(sizeof(wchar_t)*(len + 1));
 	if (p == nullptr)
-		throw std::bad_alloc();
+		return E_OUTOFMEMORY;
 
 	p[0] = (wchar_t)len;
 	memcpy(&p[1], s, len*sizeof(wchar_t));
 
-	dest.xltype = xltypeStr | xlbitDLLFree;
-	dest.val.str = p;
-	return dest;
+	dest->xltype = xltypeStr | xlbitDLLFree;
+	dest->val.str = p;
+	return S_OK;
 }
 
-template <> XLOPER12 make<XLOPER12>(const wchar_t *s)
+HRESULT SetValue(LPXLOPER12 dest, const wchar_t *s)
 {
-	return make_XLOPER12_from_string(s, (s == nullptr) ? 0 : lstrlenW(s));
+	return SetValue(dest, s, (s == nullptr) ? 0 : lstrlenW(s));
 }
 
-template <> XLOPER12 make<XLOPER12>(const std::wstring &s)
+HRESULT SetValue(LPXLOPER12 dest, const std::wstring &s)
 {
-	return make_XLOPER12_from_string(s.c_str(), s.size());
-}
-
-template <> XLOPER12 make<XLOPER12>(unsigned int value)
-{
-	return make<XLOPER12>(static_cast<double>(value));
-}
-
-template <> XLOPER12 make<XLOPER12>(unsigned long value)
-{
-	return make<XLOPER12>(static_cast<double>(value));
+	return SetValue(dest, s.c_str(), s.size());
 }
 
 ////////////////////////////////////////////////////////////////////////////

@@ -62,14 +62,14 @@ XLL_ALLOW_MAKE_FROM(const XLOPER12 &);
 // Conversions to XLOPER12.
 //
 
-template <> XLOPER12 make<XLOPER12>(const XLOPER12 &);
-template <> XLOPER12 make<XLOPER12>(double);
-template <> XLOPER12 make<XLOPER12>(bool);
-template <> XLOPER12 make<XLOPER12>(int);
-template <> XLOPER12 make<XLOPER12>(unsigned long);
-template <> XLOPER12 make<XLOPER12>(unsigned int);
-template <> XLOPER12 make<XLOPER12>(const wchar_t *);
-template <> XLOPER12 make<XLOPER12>(const std::wstring &);
+HRESULT SetValue(LPXLOPER12, const XLOPER12 &);
+HRESULT SetValue(LPXLOPER12, double);
+HRESULT SetValue(LPXLOPER12, int);
+HRESULT SetValue(LPXLOPER12, unsigned long);
+HRESULT SetValue(LPXLOPER12, bool);
+HRESULT SetValue(LPXLOPER12, const wchar_t *, size_t);
+HRESULT SetValue(LPXLOPER12, const wchar_t *);
+HRESULT SetValue(LPXLOPER12, const std::wstring &);
 
 //inline void XLOPER12_Create(LPXLOPER12 pv, unsigned long value)
 //{

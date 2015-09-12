@@ -82,7 +82,9 @@ inline LPXLOPER12 XLWrapperImpl(typename ArgumentMarshaler<TArgs>::WireType... a
 	try
 	{
 		LPXLOPER12 pvRetVal = getReturnValue();
-		*pvRetVal = make<XLOPER12>(func(ArgumentMarshaler<TArgs>::Marshal(args)...));
+		HRESULT hr = SetValue(pvRetVal, func(ArgumentMarshaler<TArgs>::Marshal(args)...));
+		if (FAILED(hr))
+			throw std::invalid_argument("Cannot convert return value to XLOPER12.");
 		return pvRetVal;
 	}
 	catch (const std::exception &)
