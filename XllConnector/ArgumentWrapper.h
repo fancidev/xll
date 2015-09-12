@@ -4,13 +4,37 @@
 #include <string>
 #include "Conversion.h"
 
-XLL_BEGIN_NAMEPSACE
-
+//
+// Excel supports calling XLL functions with a limited set of argument
+// types. To adapt to the native argument types of a UDF, XLL Connector
+// creates a wrapper function for each UDF, which marshals the arguments
+// and the return value, as well as handling any exception thrown by the
+// UDF.
+//
+// The following diagram illustrates the steps in a call from Excel to
+// a UDF:
+//
+//             +-----------------+                   +-----------------+
+//   Excel     |   XL Arg Type   |                   |   XL Ret Type   |
+//             +--------+--------+                   +--------+--------+
+//                      |                                     ^
+//                      v                                     |
+//   Marshaler       unwrap                                 wrap
+//                      |                                     ^
+//                      v                                     |
+//             +--------+--------+                   +--------+--------+
+//   UDF       | Native Arg Type | ---> Compute ---> | Native Ret Type |
+//             +-----------------+                   +-----------------+
+//
+// 
 // When Excel calls a UDF, it supports passing arguments of type LPXLOPER12
 // as well as several other native types. We call these "wrapped arguments".
 // We must "unwrap" these incoming arguments before forwarding the call to
 // the UDF. Likewise, we must "wrap" the return value of the udf to one of
 // the several return types supported by Excel.
+//
+
+XLL_BEGIN_NAMEPSACE
 
 template <typename T> struct fake_dependency : public std::false_type {};
 
