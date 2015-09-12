@@ -14,28 +14,13 @@ FunctionInfoBuilder AddFunction(FunctionInfo &f);
 
 #define EXPORT_UNDECORATED_NAME comment(linker, "/export:" __FUNCTION__ "=" __FUNCDNAME__)
 
-
 #if 0
-template <typename T> struct fake_dependency : public std::false_type {};
-template <typename T> struct ArgumentTypeText
-{
-	static_assert(fake_dependency<T>::value, "Does not support marshalling of the supplied type.");
-};
-
-#define DECLARE_ARGUMENT_TYPE_TEXT(type, text) \
-template <> struct ArgumentTypeText < type > { \
-	static const wchar_t * getTypeText() { return L##text; } \
-	};
-
-#define GET_ARGUMENT_TYPE_TEXT(type) ArgumentTypeText<type>::getTypeText()
-#else
 template <typename T> inline const wchar_t * GetTypeText()
 {
 	static_assert(false, "The supplied type is not a valid XLL argument type.");
 }
 #define DEFINE_TYPE_TEXT(type, text) \
 template<> inline const wchar_t * GetTypeText<type>() { return L##text; }
-#endif
 
 DEFINE_TYPE_TEXT(bool, "A");
 DEFINE_TYPE_TEXT(bool*, "L");
@@ -51,6 +36,7 @@ DEFINE_TYPE_TEXT(int32_t*, "N");
 DEFINE_TYPE_TEXT(wchar_t*, "C%");
 DEFINE_TYPE_TEXT(const wchar_t*, "C%");
 DEFINE_TYPE_TEXT(LPXLOPER12, "Q");
+#endif
 
 inline LPXLOPER12 getReturnValue()
 {
@@ -92,12 +78,12 @@ struct XLWrapper;
 template <typename Func, Func *func, typename TRet, typename... TArgs>
 struct XLWrapper < Func, func, TRet(TArgs...) >
 {
-	static LPXLOPER12 __stdcall Call(typename ArgumentWrapper<TArgs>::wrapped_type... args)
+	static LPXLOPER12 __stdcall Call(typename ArgumentMarshaler<TArgs>::MarshaledType... args)
 	{
 		try
 		{
 			LPXLOPER12 pvRetVal = getReturnValue();
-			*pvRetVal = make<XLOPER12>(func(ArgumentWrapper<TArgs>::unwrap(args)...));
+			*pvRetVal = make<XLOPER12>(func(ArgumentMarshaler<TArgs>::Marshal(args)...));
 			return pvRetVal;
 		}
 		catch (const std::exception &)

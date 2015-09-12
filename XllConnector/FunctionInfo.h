@@ -111,12 +111,18 @@ namespace XLL_NAMESPACE
 	template <typename TRet, typename... TArgs>
 	struct FunctionInfoFactory<TRet(TArgs...)>
 	{
+		template <typename T>
+		inline static const wchar_t * GetTypeText()
+		{
+			return ArgumentMarshaler<T>::GetTypeText();
+		}
+
 		static FunctionInfo Create(LPCWSTR entryPoint)
 		{
 			const int NumArgs = sizeof...(TArgs);
 			std::array<LPCWSTR, NumArgs + 1> texts = {
 				L"Q", // LPXLOPER12
-				GetTypeText<typename ArgumentWrapper<TArgs>::wrapped_type>()...
+				GetTypeText<TArgs>()...
 			};
 			std::wstring s;
 			for (int i = 0; i <= NumArgs; i++)

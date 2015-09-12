@@ -36,38 +36,116 @@
 
 XLL_BEGIN_NAMEPSACE
 
-template <typename T> struct fake_dependency : public std::false_type {};
+// template <typename T> struct fake_dependency : public std::false_type {};
+
+// ArgumentMarshaler<T> -- marshal an argument of native type T from
+// Excel to UDF. The default implementation exposes the argument as
+// LPXLOPER12 and uses make<T>() to convert it. This requires the
+// type cast operator to be provided for that type.
+//
+// NativeType: the argument type of the UDF
+// StorageType: an intermediary type that is convertible from
+// XLOPER12 and convertible to NativeType. 
+// The purpose of StorageType is to automatically release the
+// intermediary object after the call.
+
+//template <typename NativeType>
+//struct ArgumentMarshaler
+//{
+//	typedef LPXLOPER12 MarshaledType;
+//	static inline const wchar_t * GetTypeText() { return L"Q"; }
+//	static inline NativeType Marshal(MarshaledType arg)
+//	{
+//		return make<NativeType>(*arg);
+//	}
+//};
 
 template <typename T>
-struct ArgumentWrapper
+struct ArgumentMarshaler
 {
-	static_assert(fake_dependency<T>::value,
-		"Do not know how to wrap the supplied argument type. "
-		"Specialize xll::ArgumentWrapper<T> to support it.");
-	// typedef ?? wrapped_type;
-	// static inline T unwrap(wrapped_type value);
+	// typedef T NativeType;
+	// typedef ? MarshaledType;
+	// typedef ? StorageType;
+	// static inline StorageType Marshal(MarshaledType arg);
+	// static inline LPCWSTR GetTypeText() { return L"Q"; }
+	template <typename U> struct always_false : std::false_type {};
+	static_assert(always_false<T>::value,
+		"Do not know how to marshal the supplied argument type. "
+		"Specialize xll::ArgumentMarshaler<T> to support it.");
 };
 
-#define DEFINE_SIMPLE_ARGUMENT_WRAPPER(NativeType, WrappedType) \
-template <> struct ArgumentWrapper<NativeType> \
-	{ \
-	typedef WrappedType wrapped_type; \
-	static inline NativeType unwrap(WrappedType v) { return v; } \
-	}
-
-DEFINE_SIMPLE_ARGUMENT_WRAPPER(int, int);
-DEFINE_SIMPLE_ARGUMENT_WRAPPER(double, double);
-DEFINE_SIMPLE_ARGUMENT_WRAPPER(const char *, const char *);
-DEFINE_SIMPLE_ARGUMENT_WRAPPER(std::wstring, const wchar_t *);
-
-template <> struct ArgumentWrapper < VARIANT >
+template <typename T, typename TStorage = T>
+struct VariantArgumentMarshaler
 {
-	typedef LPXLOPER12 wrapped_type;
-	static VARIANT unwrap(LPXLOPER12 v)
+	typedef T NativeType;
+	typedef LPXLOPER12 MarshaledType;
+	static inline const wchar_t * GetTypeText() { return L"Q"; }
+	static inline TStorage Marshal(LPXLOPER12 arg)
 	{
-		// TODO: use a wrapper to free memory
-		return make<VARIANT>(*v);
+		//return make<TStorage>(*arg);
+		return TStorage(*arg);
 	}
+};
+
+template <typename T, char TypeChar1, char TypeChar2 = 0>
+struct SimpleArgumentMarshaler
+{
+	typedef T NativeType;
+	typedef T UdfType;
+	typedef T MarshaledType;
+	typedef T XllType;
+	static inline const wchar_t * GetTypeText()
+	{
+		static const wchar_t typeText[] = { TypeChar1, TypeChar2, 0 };
+		return typeText;
+	}
+	static inline T Marshal(T arg)
+	{
+		return arg;
+	}
+};
+
+template <typename TNative, typename TMarshaled, typename TStorage, char TypeChar1, char TypeChar2 = 0>
+struct ArgumentMarshalerImpl
+{
+	typedef TNative NativeType;
+	typedef TMarshaled MarshaledType;
+	typedef TStorage StorageType;
+	static inline const wchar_t * GetTypeText()
+	{
+		static const wchar_t typeText[] = { TypeChar1, TypeChar2, 0 };
+		return typeText;
+	}
+	static inline TStorage Marshal(TMarshaled arg)
+	{
+		return arg;
+	}
+};
+
+#define DEFINE_SIMPLE_ARGUMENT_MARSHALER(nativeType, marshaledType, typeText) \
+	template <> struct ArgumentMarshaler<nativeType> \
+	{ \
+		typedef marshaledType MarshaledType; \
+		static inline const wchar_t * GetTypeText() { return L#typeText; } \
+		static inline nativeType Marshal(marshaledType v) { return v; } \
+	}
+
+template <> struct ArgumentMarshaler<double> : SimpleArgumentMarshaler<double, 'B'> {};
+template <> struct ArgumentMarshaler<int> : SimpleArgumentMarshaler<int, 'J'>{};
+template <> struct ArgumentMarshaler<const std::wstring &> 
+	: ArgumentMarshalerImpl < std::wstring, LPCWSTR, std::wstring, 'C', '%' > {};
+template <> struct ArgumentMarshaler<const char *>
+	: ArgumentMarshalerImpl < const char *, const char *, const char *, 'C' > {};
+//DEFINE_SIMPLE_ARGUMENT_WRAPPER(int, int, "J");
+//DEFINE_SIMPLE_ARGUMENT_WRAPPER(double, double, "B");
+//DEFINE_SIMPLE_ARGUMENT_WRAPPER(const char *, const char *, "C");
+//DEFINE_SIMPLE_ARGUMENT_WRAPPER(std::wstring, const wchar_t *, "C%");
+
+// TODO: use a wrapper to free memory
+template <> 
+struct ArgumentMarshaler<VARIANT> 
+	: VariantArgumentMarshaler<VARIANT>
+{
 };
 
 class SafeArrayWrapper
@@ -85,7 +163,7 @@ public:
 			other.psa = nullptr;
 		}
 	}
-	SafeArrayWrapper(const XLOPER12 *pv) : psa(make<SAFEARRAY*>(*pv)){}
+	SafeArrayWrapper(const XLOPER12 &v) : psa(make<SAFEARRAY*>(v)){}
 	~SafeArrayWrapper()
 	{
 		if (psa)
@@ -97,19 +175,16 @@ public:
 	operator SAFEARRAY*() { return psa; }
 };
 
-template <> struct ArgumentWrapper < SAFEARRAY* >
+template <> 
+struct ArgumentMarshaler<SAFEARRAY*> 
+	: VariantArgumentMarshaler<SAFEARRAY*, SafeArrayWrapper>
 {
-	typedef LPXLOPER12 wrapped_type;
-	static SafeArrayWrapper unwrap(LPXLOPER12 v)
-	{
-		return SafeArrayWrapper(v);
-	}
 };
 
-template <typename T> struct ArgumentWrapper<T &> : ArgumentWrapper < T > {};
-template <typename T> struct ArgumentWrapper<T &&> : ArgumentWrapper < T > {};
-template <typename T> struct ArgumentWrapper<T const> : ArgumentWrapper < T > {};
-template <typename T> struct ArgumentWrapper<T volatile> : ArgumentWrapper < T > {};
-template <typename T> struct ArgumentWrapper<T const volatile> : ArgumentWrapper < T > {};
+//template <typename T> struct ArgumentWrapper<T &> : ArgumentWrapper < T > {};
+//template <typename T> struct ArgumentWrapper<T &&> : ArgumentWrapper < T > {};
+//template <typename T> struct ArgumentWrapper<T const> : ArgumentWrapper < T > {};
+//template <typename T> struct ArgumentWrapper<T volatile> : ArgumentWrapper < T > {};
+//template <typename T> struct ArgumentWrapper<T const volatile> : ArgumentWrapper < T > {};
 
 XLL_END_NAMESPACE
