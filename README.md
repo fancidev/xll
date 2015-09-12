@@ -78,11 +78,11 @@ To debug the XLL, do the following:
 
 Being a one-man project, there are a few limitations:
 
-- Visual Studio 2013 or higher is required, because this library makes use of variadic templates to generate xll wrappers.
+- Visual Studio 2013 or higher is required, as this library uses C++11 features such as variadic templates and move semantics.
 
-- Only Excel 2007 and higher is supported as they expose a different interface than prior versions of Excel, which supports more parameters, longer strings, and larger worksheet range. Support for prior versions of Excel may be added later.
+- Only Excel 2007 and higher is supported as they expose a different interface than prior versions of Excel, which supports more parameters, longer strings, and larger worksheet range.
 
-- Only 32-bit Excel is supported at the moment. 64-bit support will be added later.
+- Both 32-bit and 64-bit Excel are supported, but only 32-bit is tested because I don't have 64-bit Excel installed.
 
 ## License
 
