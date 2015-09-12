@@ -42,13 +42,14 @@ DEFINE_TYPE_TEXT(bool*, "L");
 DEFINE_TYPE_TEXT(double, "B");
 DEFINE_TYPE_TEXT(double*, "E");
 DEFINE_TYPE_TEXT(char*, "C");
+DEFINE_TYPE_TEXT(const char*, "C");
 DEFINE_TYPE_TEXT(uint16_t, "H");
 DEFINE_TYPE_TEXT(int16_t, "I");
 DEFINE_TYPE_TEXT(int16_t*, "M");
 DEFINE_TYPE_TEXT(int32_t, "J");
 DEFINE_TYPE_TEXT(int32_t*, "N");
 DEFINE_TYPE_TEXT(wchar_t*, "C%");
-DEFINE_TYPE_TEXT(LPCWSTR, "C%");
+DEFINE_TYPE_TEXT(const wchar_t*, "C%");
 DEFINE_TYPE_TEXT(LPXLOPER12, "Q");
 
 inline LPXLOPER12 getReturnValue()

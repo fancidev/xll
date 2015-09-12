@@ -44,6 +44,7 @@ XLL_BEGIN_NAMEPSACE
 
 XLL_ALLOW_MAKE_FROM(bool);
 XLL_ALLOW_MAKE_FROM(int);
+XLL_ALLOW_MAKE_FROM(unsigned int);
 XLL_ALLOW_MAKE_FROM(unsigned long);
 XLL_ALLOW_MAKE_FROM(double);
 XLL_ALLOW_MAKE_FROM(const wchar_t *);
@@ -66,6 +67,7 @@ template <> XLOPER12 make<XLOPER12>(double);
 template <> XLOPER12 make<XLOPER12>(bool);
 template <> XLOPER12 make<XLOPER12>(int);
 template <> XLOPER12 make<XLOPER12>(unsigned long);
+template <> XLOPER12 make<XLOPER12>(unsigned int);
 template <> XLOPER12 make<XLOPER12>(const wchar_t *);
 template <> XLOPER12 make<XLOPER12>(const std::wstring &);
 

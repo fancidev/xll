@@ -140,6 +140,11 @@ template <> XLOPER12 make<XLOPER12>(const std::wstring &s)
 	return make_XLOPER12_from_string(s.c_str(), s.size());
 }
 
+template <> XLOPER12 make<XLOPER12>(unsigned int value)
+{
+	return make<XLOPER12>(static_cast<double>(value));
+}
+
 template <> XLOPER12 make<XLOPER12>(unsigned long value)
 {
 	return make<XLOPER12>(static_cast<double>(value));

@@ -33,6 +33,7 @@ template <> struct ArgumentWrapper<NativeType> \
 
 DEFINE_SIMPLE_ARGUMENT_WRAPPER(int, int);
 DEFINE_SIMPLE_ARGUMENT_WRAPPER(double, double);
+DEFINE_SIMPLE_ARGUMENT_WRAPPER(const char *, const char *);
 DEFINE_SIMPLE_ARGUMENT_WRAPPER(std::wstring, const wchar_t *);
 
 template <> struct ArgumentWrapper < VARIANT >
