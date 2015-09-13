@@ -100,6 +100,11 @@ inline LPXLOPER12 XLWrapperImpl(typename ArgumentMarshaler<TArgs>::WireType... a
 
 XLL_END_NAMESPACE
 
+#define XLL_QUOTE_(x) #x
+#define XLL_QUOTE(x) XLL_QUOTE_(x)
+#define XLL_CONCAT_(x,y) x##y
+#define XLL_CONCAT(x,y) XLL_CONCAT_(x,y)
+
 #define EXPORT_XLL_FUNCTION(f) \
 	template <typename Func> struct XLWrapper_##f; \
 	template <typename TRet, typename... TArgs> \
@@ -107,11 +112,11 @@ XLL_END_NAMESPACE
 	{ \
 		static LPXLOPER12 __stdcall Call(typename ::XLL_NAMESPACE::ArgumentMarshaler<TArgs>::WireType... args) \
 		{ \
-			__pragma(comment(linker, "/export:" "XL" #f "=" __FUNCDNAME__)) \
+			__pragma(comment(linker, "/export:" XLL_WRAPPER_PREFIX #f "=" __FUNCDNAME__)) \
 			return ::XLL_NAMESPACE::XLWrapperImpl<decltype(f), f, TRet, TArgs...>(args...); \
 		} \
 	}; \
 	static auto XLWrapper_Call_##f = XLWrapper_##f< \
 		typename ::XLL_NAMESPACE::StripCallingConvention<decltype(f)>::type>::Call; \
 	static ::XLL_NAMESPACE::FunctionInfoBuilder XLFun_##f = ::XLL_NAMESPACE::AddFunction( \
-		::XLL_NAMESPACE::FunctionInfoFactory<decltype(f)>::Create(L"XL" L#f)).Name(L#f)
+		::XLL_NAMESPACE::FunctionInfoFactory<decltype(f)>::Create(XLL_CONCAT(L,XLL_WRAPPER_PREFIX) L#f)).Name(L#f)

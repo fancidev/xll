@@ -13,9 +13,8 @@
 #define XLL_BEGIN_NAMEPSACE namespace XLL_NAMESPACE {
 #define XLL_END_NAMESPACE }
 
-// not used
-#ifndef XLL_PREFIX
-#define XLL_PREFIX XL
+#ifndef XLL_WRAPPER_PREFIX
+#define XLL_WRAPPER_PREFIX "XL12"
 #endif
 
 #ifndef XLL_SUPPORT_THREAD_LOCAL
