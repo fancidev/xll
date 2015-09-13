@@ -66,6 +66,42 @@ struct ArgumentMarshaler
 		"Specialize xll::ArgumentMarshaler<T> to support it.");
 };
 
+template <typename T, T... Elem> struct Sequence
+{
+	static const T * ToArray()
+	{
+		static const T array[] = { Elem... };
+		return array;
+	}
+};
+
+//template <typename T, T Front, typename Seq> struct PushFront;
+//template <typename T, T Front, T... Elem>
+//struct PushFront < T, Front, Sequence<T, Elem...> >
+//{
+//	typedef Sequence<T, Front, Elem...> type;
+//};
+
+template <typename T, typename...> struct Concat;
+
+template <typename T> 
+struct Concat < T > 
+{
+	typedef Sequence<T> type; 
+};
+
+template <typename T, T... Elem>
+struct Concat < T, Sequence<T, Elem...> >
+{
+	typedef Sequence<T, Elem...> type;
+};
+
+template <typename T, T... Elem1, T... Elem2, typename... Rest>
+struct Concat < T, Sequence<T, Elem1...>, Sequence<T, Elem2...>, Rest... >
+{
+	typedef typename Concat<T, Sequence < T, Elem1..., Elem2... >, Rest...>::type type;
+};
+
 // ArgumentMarshalerImpl - generic implementation of ArgumentMarshaler
 //
 // TUserType     native argument type of udf
@@ -96,6 +132,9 @@ struct ArgumentMarshalerImpl
 	{
 		return arg;
 	}
+	typedef typename std::conditional<TypeChar2 == 0, 
+		Sequence<wchar_t, TypeChar1>,
+		Sequence<wchar_t, TypeChar1, TypeChar2>>::type TypeTextSequence;
 };
 
 #define IMPLEMENT_ARGUMENT_MARSHALER(UserType, ...) \
@@ -116,6 +155,7 @@ IMPLEMENT_ARGUMENT_MARSHALER(int, 'J');
 // String marshalling
 //
 
+IMPLEMENT_ARGUMENT_MARSHALER(const wchar_t *, 'C', '%');
 IMPLEMENT_ARGUMENT_MARSHALER(std::wstring, 'C', '%', LPCWSTR);
 IMPLEMENT_ARGUMENT_MARSHALER_AS(const std::wstring &, std::wstring);
 

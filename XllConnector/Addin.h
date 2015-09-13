@@ -76,6 +76,13 @@ struct StripCallingConvention < TRet __vectorcall(TArgs...) >
 };
 #endif
 
+template <typename... TArgs>
+inline const wchar_t * GetTypeTextImpl()
+{
+	typedef typename Concat<wchar_t, typename ArgumentMarshaler<TArgs>::TypeTextSequence ..., Sequence<wchar_t, 0>>::type seq_type;
+	return seq_type::ToArray();
+}
+
 template <typename Func, Func *func, typename TRet, typename... TArgs>
 inline LPXLOPER12 XLWrapperImpl(typename ArgumentMarshaler<TArgs>::WireType... args)
 {
@@ -115,8 +122,13 @@ XLL_END_NAMESPACE
 			__pragma(comment(linker, "/export:" XLL_WRAPPER_PREFIX #f "=" __FUNCDNAME__)) \
 			return ::XLL_NAMESPACE::XLWrapperImpl<decltype(f), f, TRet, TArgs...>(args...); \
 		} \
+		static const wchar_t * GetTypeText() \
+		{ \
+			return ::XLL_NAMESPACE::GetTypeTextImpl<TArgs...>(); \
+		} \
 	}; \
 	static auto XLWrapper_Call_##f = XLWrapper_##f< \
 		typename ::XLL_NAMESPACE::StripCallingConvention<decltype(f)>::type>::Call; \
+	static const wchar_t * XLTypeText_##f = XLWrapper_##f<::XLL_NAMESPACE::StripCallingConvention<decltype(f)>::type>::GetTypeText(); \
 	static ::XLL_NAMESPACE::FunctionInfoBuilder XLFun_##f = ::XLL_NAMESPACE::AddFunction( \
 		::XLL_NAMESPACE::FunctionInfoFactory<decltype(f)>::Create(XLL_CONCAT(L,XLL_WRAPPER_PREFIX) L#f)).Name(L#f)

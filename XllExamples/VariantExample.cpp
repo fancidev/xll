@@ -16,3 +16,13 @@ std::wstring VariantType(VARIANTARG *pv)
 }
 
 EXPORT_XLL_FUNCTION(VariantType);
+
+int BigFunc(
+	int, double, int, double, int,
+	VARIANT*, VARIANT*, VARIANT*, VARIANT*, VARIANT*,
+	const char *, const wchar_t *, std::wstring, const std::wstring &)
+{
+	return 7;
+}
+
+EXPORT_XLL_FUNCTION(BigFunc);
