@@ -98,23 +98,20 @@ inline LPXLOPER12 XLWrapperImpl(typename ArgumentMarshaler<TArgs>::WireType... a
 	return const_cast<ExcelVariant*>(&ExcelVariant::ErrValue);
 }
 
-template <typename Func, Func *func, typename = typename StripCallingConvention<Func>::type>
-struct XLWrapper;
-
 XLL_END_NAMESPACE
 
 #define EXPORT_XLL_FUNCTION(f) \
-	namespace XLL_NAMESPACE { \
-		template <typename TRet, typename... TArgs> \
-		struct XLWrapper < decltype(f), f, TRet(TArgs...) > \
+	template <typename Func> struct XLWrapper_##f; \
+	template <typename TRet, typename... TArgs> \
+	struct XLWrapper_##f < TRet(TArgs...) > \
+	{ \
+		static LPXLOPER12 __stdcall Call(typename ::XLL_NAMESPACE::ArgumentMarshaler<TArgs>::WireType... args) \
 		{ \
-			static LPXLOPER12 __stdcall Call(typename ArgumentMarshaler<TArgs>::WireType... args) \
-			{ \
-				__pragma(comment(linker, "/export:" "XL" #f "=" __FUNCDNAME__)) \
-				return XLWrapperImpl<decltype(f), f, TRet, TArgs...>(args...); \
-			} \
-		}; \
-		static auto XLWrapper_Call_##f = XLWrapper<decltype(f), f>::Call; \
-	} \
+			__pragma(comment(linker, "/export:" "XL" #f "=" __FUNCDNAME__)) \
+			return ::XLL_NAMESPACE::XLWrapperImpl<decltype(f), f, TRet, TArgs...>(args...); \
+		} \
+	}; \
+	static auto XLWrapper_Call_##f = XLWrapper_##f< \
+		typename ::XLL_NAMESPACE::StripCallingConvention<decltype(f)>::type>::Call; \
 	static ::XLL_NAMESPACE::FunctionInfoBuilder XLFun_##f = ::XLL_NAMESPACE::AddFunction( \
 		::XLL_NAMESPACE::FunctionInfoFactory<decltype(f)>::Create(L"XL" L#f)).Name(L#f)

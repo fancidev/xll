@@ -20,10 +20,14 @@ double Square(double x)
 	return x * x;
 }
 
-EXPORT_XLL_FUNCTION(Plus)
-.Description(L"Returns the sum of two numbers.")
-.Arg(L"a", L"first number")
-.Arg(L"b", L"second number");
+// Test using EXPORT_XLL_FUNCTION in a namespace.
+namespace
+{
+	EXPORT_XLL_FUNCTION(Plus)
+		.Description(L"Returns the sum of two numbers.")
+		.Arg(L"a", L"first number")
+		.Arg(L"b", L"second number");
+}
 
 EXPORT_XLL_FUNCTION(Minus)
 .Category(L"Test Functions")
