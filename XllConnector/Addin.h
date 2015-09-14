@@ -73,6 +73,12 @@ inline LPXLOPER12 XLWrapperImpl(typename ArgumentMarshaler<TArgs>::WireType... a
 	return const_cast<ExcelVariant*>(&ExcelVariant::ErrValue);
 }
 
+template <typename Func>
+static const wchar_t * GetTypeTextImpl(Func *)
+{
+	return TypeText<Func>::SeqTypeW::ToArray();
+}
+
 XLL_END_NAMESPACE
 
 #define XLL_QUOTE_(x) #x
@@ -90,10 +96,8 @@ XLL_END_NAMESPACE
 			__pragma(comment(linker, "/export:" XLL_WRAPPER_PREFIX #f "=" __FUNCDNAME__)) \
 			return ::XLL_NAMESPACE::XLWrapperImpl<decltype(f), f, TRet, TArgs...>(args...); \
 		} \
-		static const wchar_t * GetTypeText() \
-		{ \
-			auto &r = Call; \
-			return ::XLL_NAMESPACE::TypeText<std::remove_reference<decltype(r)>::type>::SeqTypeW::ToArray(); \
+		static const wchar_t * GetTypeText() { \
+			return ::XLL_NAMESPACE::GetTypeTextImpl(Call); \
 		} \
 	}; \
 	static ::XLL_NAMESPACE::FunctionInfoBuilder XLFun_##f = ::XLL_NAMESPACE::AddFunction( \

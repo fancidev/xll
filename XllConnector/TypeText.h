@@ -61,8 +61,8 @@ namespace XLL_NAMESPACE
 	DEFINE_TYPE_TEXT(bool*, 'L');
 	DEFINE_TYPE_TEXT(double, 'B');
 	DEFINE_TYPE_TEXT(double*, 'E');
-	DEFINE_TYPE_TEXT(char*, 'C');      // nul-terminated
-	DEFINE_TYPE_TEXT(const char*, 'C');      // nul-terminated
+	DEFINE_TYPE_TEXT(char*, 'C'); // nul-terminated
+	DEFINE_TYPE_TEXT(const char*, 'C'); // nul-terminated
 	DEFINE_TYPE_TEXT(wchar_t*, 'C', '%'); // nul-terminated
 	DEFINE_TYPE_TEXT(const wchar_t*, 'C', '%'); // nul-terminated
 	DEFINE_TYPE_TEXT(uint16_t, 'H');
