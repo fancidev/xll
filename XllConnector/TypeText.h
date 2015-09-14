@@ -44,7 +44,7 @@ namespace XLL_NAMESPACE
 	// https://msdn.microsoft.com/en-us/library/office/bb687900.aspx
 	// 
 
-	template <typename T> struct TypeText
+	template <typename T, typename Char> struct TypeText
 	{
 		template <typename U> struct always_false : std::false_type {};
 		static_assert(always_false<T>::value,
@@ -52,9 +52,8 @@ namespace XLL_NAMESPACE
 	};
 
 #define DEFINE_TYPE_TEXT(type, ...) \
-	template <> struct TypeText<type> { \
-		typedef Sequence<char, __VA_ARGS__> SeqTypeA; \
-		typedef Sequence<wchar_t, __VA_ARGS__> SeqTypeW; \
+	template <typename Char> struct TypeText<type, Char> { \
+		typedef Sequence<Char, __VA_ARGS__> SeqType; \
 	}
 
 	DEFINE_TYPE_TEXT(bool, 'A');
@@ -72,16 +71,13 @@ namespace XLL_NAMESPACE
 	DEFINE_TYPE_TEXT(int32_t*, 'N');
 	DEFINE_TYPE_TEXT(LPXLOPER12, 'Q');
 
-	template <typename TRet, typename... TArgs>
-	struct TypeText < TRet __stdcall(TArgs...) >
+	template <typename Char, typename TRet, typename... TArgs>
+	inline const Char * GetTypeTextImpl(TRet(__stdcall*)(TArgs...))
 	{
-		typedef typename Concat < char,
-			typename TypeText<typename TRet>::SeqTypeA,
-			typename TypeText<typename TArgs>::SeqTypeA...,
-			Sequence<char, 0> > ::type SeqTypeA;
-		typedef typename Concat < wchar_t,
-			typename TypeText<typename TRet>::SeqTypeW,
-			typename TypeText<typename TArgs>::SeqTypeW...,
-			Sequence<wchar_t, 0 > > ::type SeqTypeW;
-	};
+		typedef typename Concat < Char,
+			typename TypeText<typename TRet, Char>::SeqType,
+			typename TypeText<typename TArgs, Char>::SeqType...,
+			Sequence<Char, 0> > ::type SeqType;
+		return SeqType::ToArray();
+	}
 }
