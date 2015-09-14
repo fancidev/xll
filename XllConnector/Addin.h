@@ -6,12 +6,9 @@
 #include "xlldef.h"
 #include "FunctionInfo.h"
 #include "Conversion.h"
-#include "TypeText.h"
 #include "Marshal.h"
 
 XLL_BEGIN_NAMEPSACE
-
-FunctionInfoBuilder AddFunction(FunctionInfo &f);
 
 inline LPXLOPER12 getReturnValue()
 {
@@ -90,10 +87,8 @@ XLL_END_NAMESPACE
 			__pragma(comment(linker, "/export:" XLL_WRAPPER_PREFIX #f "=" __FUNCDNAME__)) \
 			return ::XLL_NAMESPACE::XLWrapperImpl<decltype(f), f, TRet, TArgs...>(args...); \
 		} \
-		static const wchar_t * GetTypeText() { \
-			return ::XLL_NAMESPACE::GetTypeTextImpl<wchar_t>(Call); \
-		} \
 	}; \
-	static ::XLL_NAMESPACE::FunctionInfoBuilder XLFun_##f = ::XLL_NAMESPACE::AddFunction( \
-		::XLL_NAMESPACE::FunctionInfo(XLWrapper_##f<::XLL_NAMESPACE::StripCallingConvention<decltype(f)>::type>::GetTypeText(), \
-		XLL_CONCAT(L,XLL_WRAPPER_PREFIX) L#f)).Name(L#f)
+	static auto XLFun_##f = ::XLL_NAMESPACE::FunctionInfoBuilder( \
+		::XLL_NAMESPACE::FunctionInfo::Create( \
+			XLWrapper_##f<::XLL_NAMESPACE::StripCallingConvention<decltype(f)>::type>::Call, \
+			XLL_CONCAT(L,XLL_WRAPPER_PREFIX) L#f)).Name(L#f)

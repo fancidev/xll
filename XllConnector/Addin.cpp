@@ -12,18 +12,6 @@ namespace XLL_NAMESPACE
 #if XLL_SUPPORT_THREAD_LOCAL
 	__declspec(thread) XLOPER12 xllReturnValue;
 #endif
-
-	static std::vector<FunctionInfo> & registry()
-	{
-		static std::vector<FunctionInfo> s_functions;
-		return s_functions;
-	}
-
-	FunctionInfoBuilder AddFunction(FunctionInfo &f)
-	{
-		registry().push_back(f);
-		return FunctionInfoBuilder(registry().back());
-	}
 }
 
 using namespace XLL_NAMESPACE;
@@ -108,7 +96,7 @@ int WINAPI xlAutoOpen()
 	XLOPER12 xDLL;
 	if (Excel12(xlGetName, &xDLL, 0) == xlretSuccess)
 	{
-		for (FunctionInfo &f : registry())
+		for (FunctionInfo &f : XLL_NAMESPACE::FunctionInfo::registry())
 		{
 			RegisterFunction(&xDLL, f);
 		}

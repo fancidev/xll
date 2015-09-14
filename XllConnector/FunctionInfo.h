@@ -46,6 +46,20 @@ namespace XLL_NAMESPACE
 			macroType(1), category(), shortcut(), helpTopic(), isPure(), isThreadSafe()
 		{
 		}
+
+		static std::vector<FunctionInfo> & registry()
+		{
+			static std::vector<FunctionInfo> s_functions;
+			return s_functions;
+		}
+
+		template <typename TRet, typename... TArgs>
+		static FunctionInfo& Create(TRet(__stdcall *func)(TArgs...), LPCWSTR entryPoint)
+		{
+			const wchar_t *typeText = GetTypeTextImpl<wchar_t>(func);
+			registry().emplace_back(typeText, entryPoint);
+			return registry().back();
+		}
 	};
 
 	class FunctionInfoBuilder
@@ -106,40 +120,4 @@ namespace XLL_NAMESPACE
 			return (*this);
 		}
 	};
-
-#if 0
-	template <typename Func> class FunctionInfoFactory;
-
-	template <typename TRet, typename... TArgs>
-	struct FunctionInfoFactory<TRet(TArgs...)>
-	{
-		template <typename T>
-		inline static const wchar_t * GetTypeText()
-		{
-			return ArgumentMarshaler<T>::GetTypeText();
-		}
-
-		static FunctionInfo Create(LPCWSTR entryPoint)
-		{
-			const int NumArgs = sizeof...(TArgs);
-			std::array<LPCWSTR, NumArgs + 1> texts = {
-				L"Q", // LPXLOPER12
-				GetTypeText<TArgs>()...
-			};
-			std::wstring s;
-			for (int i = 0; i <= NumArgs; i++)
-			{
-				s += texts[i];
-			}
-			return FunctionInfo(s.c_str(), entryPoint);
-		}
-	};
-#ifndef _WIN64
-	template <typename TRet, typename... TArgs>
-	struct FunctionInfoFactory<TRet __stdcall(TArgs...)>
-		: public FunctionInfoFactory<TRet(TArgs...)>
-	{
-	};
-#endif
-#endif
 }
