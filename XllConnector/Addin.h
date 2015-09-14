@@ -6,37 +6,12 @@
 #include "xlldef.h"
 #include "FunctionInfo.h"
 #include "Conversion.h"
-#include <cstdint>
+#include "TypeText.h"
+#include "Marshal.h"
 
 XLL_BEGIN_NAMEPSACE
 
 FunctionInfoBuilder AddFunction(FunctionInfo &f);
-
-#define EXPORT_UNDECORATED_NAME comment(linker, "/export:" __FUNCTION__ "=" __FUNCDNAME__)
-
-#if 0
-template <typename T> inline const wchar_t * GetTypeText()
-{
-	static_assert(false, "The supplied type is not a valid XLL argument type.");
-}
-#define DEFINE_TYPE_TEXT(type, text) \
-template<> inline const wchar_t * GetTypeText<type>() { return L##text; }
-
-DEFINE_TYPE_TEXT(bool, "A");
-DEFINE_TYPE_TEXT(bool*, "L");
-DEFINE_TYPE_TEXT(double, "B");
-DEFINE_TYPE_TEXT(double*, "E");
-DEFINE_TYPE_TEXT(char*, "C");
-DEFINE_TYPE_TEXT(const char*, "C");
-DEFINE_TYPE_TEXT(uint16_t, "H");
-DEFINE_TYPE_TEXT(int16_t, "I");
-DEFINE_TYPE_TEXT(int16_t*, "M");
-DEFINE_TYPE_TEXT(int32_t, "J");
-DEFINE_TYPE_TEXT(int32_t*, "N");
-DEFINE_TYPE_TEXT(wchar_t*, "C%");
-DEFINE_TYPE_TEXT(const wchar_t*, "C%");
-DEFINE_TYPE_TEXT(LPXLOPER12, "Q");
-#endif
 
 inline LPXLOPER12 getReturnValue()
 {
@@ -76,13 +51,6 @@ struct StripCallingConvention < TRet __vectorcall(TArgs...) >
 };
 #endif
 
-template <typename... TArgs>
-inline const wchar_t * GetTypeTextImpl()
-{
-	typedef typename Concat<wchar_t, typename ArgumentMarshaler<TArgs>::TypeTextSequence ..., Sequence<wchar_t, 0>>::type seq_type;
-	return seq_type::ToArray();
-}
-
 template <typename Func, Func *func, typename TRet, typename... TArgs>
 inline LPXLOPER12 XLWrapperImpl(typename ArgumentMarshaler<TArgs>::WireType... args)
 {
@@ -120,15 +88,22 @@ XLL_END_NAMESPACE
 		static LPXLOPER12 __stdcall Call(typename ::XLL_NAMESPACE::ArgumentMarshaler<TArgs>::WireType... args) \
 		{ \
 			__pragma(comment(linker, "/export:" XLL_WRAPPER_PREFIX #f "=" __FUNCDNAME__)) \
+			__pragma(comment(linker, "/include:" __FUNCDNAME__)) \
 			return ::XLL_NAMESPACE::XLWrapperImpl<decltype(f), f, TRet, TArgs...>(args...); \
 		} \
 		static const wchar_t * GetTypeText() \
 		{ \
-			return ::XLL_NAMESPACE::GetTypeTextImpl<TArgs...>(); \
+			return ::XLL_NAMESPACE::GetTypeText<TRet,TArgs...>(); \
 		} \
 	}; \
-	static auto XLWrapper_Call_##f = XLWrapper_##f< \
-		typename ::XLL_NAMESPACE::StripCallingConvention<decltype(f)>::type>::Call; \
-	static const wchar_t * XLTypeText_##f = XLWrapper_##f<::XLL_NAMESPACE::StripCallingConvention<decltype(f)>::type>::GetTypeText(); \
+	typedef XLWrapper_##f<::XLL_NAMESPACE::StripCallingConvention<decltype(f)>::type> XLWrapperType_##f; \
+	static auto& XLWrapper_Call_##f = XLWrapperType_##f::Call; \
 	static ::XLL_NAMESPACE::FunctionInfoBuilder XLFun_##f = ::XLL_NAMESPACE::AddFunction( \
-		::XLL_NAMESPACE::FunctionInfoFactory<decltype(f)>::Create(XLL_CONCAT(L,XLL_WRAPPER_PREFIX) L#f)).Name(L#f)
+		::XLL_NAMESPACE::FunctionInfo(XLWrapper_##f<::XLL_NAMESPACE::StripCallingConvention<decltype(f)>::type>::GetTypeText(), \
+		XLL_CONCAT(L,XLL_WRAPPER_PREFIX) L#f)).Name(L#f)
+
+//static auto XLWrapper_Call_##f = XLWrapperType_##f::Call; \
+//typedef XLWrapper_##f<::XLL_NAMESPACE::StripCallingConvention<decltype(f)>::type> XLWrapperType_##f; \
+//static const wchar_t * XLWrapper_TypeText_##f = ::XLL_NAMESPACE::TypeText<decltype(XLWrapperType_##f::Call)>::SeqTypeW::ToArray(); \
+//	static ::XLL_NAMESPACE::FunctionInfoBuilder XLFun_##f = ::XLL_NAMESPACE::AddFunction( \
+//		::XLL_NAMESPACE::FunctionInfo(XLWrapper_TypeText_##f, XLL_CONCAT(L,XLL_WRAPPER_PREFIX) L#f)).Name(L#f)

@@ -59,82 +59,33 @@ struct ArgumentMarshaler
 	// typedef T UserType;
 	// typedef ? WireType;
 	// static inline ? Marshal(WireType arg);
-	// static inline LPCWSTR GetTypeText() { return L"Q"; }
 	template <typename U> struct always_false : std::false_type {};
 	static_assert(always_false<T>::value,
 		"Do not know how to marshal the supplied argument type. "
 		"Specialize xll::ArgumentMarshaler<T> to support it.");
 };
 
-template <typename T, T... Elem> struct Sequence
-{
-	static const T * ToArray()
-	{
-		static const T array[] = { Elem... };
-		return array;
-	}
-};
-
-//template <typename T, T Front, typename Seq> struct PushFront;
-//template <typename T, T Front, T... Elem>
-//struct PushFront < T, Front, Sequence<T, Elem...> >
-//{
-//	typedef Sequence<T, Front, Elem...> type;
-//};
-
-template <typename T, typename...> struct Concat;
-
-template <typename T> 
-struct Concat < T > 
-{
-	typedef Sequence<T> type; 
-};
-
-template <typename T, T... Elem>
-struct Concat < T, Sequence<T, Elem...> >
-{
-	typedef Sequence<T, Elem...> type;
-};
-
-template <typename T, T... Elem1, T... Elem2, typename... Rest>
-struct Concat < T, Sequence<T, Elem1...>, Sequence<T, Elem2...>, Rest... >
-{
-	typedef typename Concat<T, Sequence < T, Elem1..., Elem2... >, Rest...>::type type;
-};
-
 // ArgumentMarshalerImpl - generic implementation of ArgumentMarshaler
 //
-// TUserType     native argument type of udf
-// TypeChar1     first character of the wire-type text
-// TypeChar2     second character of the wire-type text, or 0 if none
-// TWireType     wire type, default to the same as user type
-// TAdapterType  return type of the Marshal function. This type must be:
-//               1) implicitly constructible from WireType, and 
-//               2) implicitly convertible to UserType.
-//               The adapter object is used to automatically free any
-//               resources allocated during argument marshalling.
+// ArgUserType     native argument type of udf
+// ArgWireType     wire type, default to the same as user type
+// ArgAdapterType  return type of Marshal(). This type must be:
+//                 1) implicitly constructible from WireType, and 
+//                 2) implicitly convertible to UserType.
+//                 The adapter object is used to automatically free any
+//                 resources allocated during argument marshalling.
 template <
-	typename TUserType, 
-	char TypeChar1, 
-	char TypeChar2 = 0, 
-	typename TWireType = TUserType,
-	typename TAdapterType = TUserType>
+	typename ArgUserType, 
+	typename ArgWireType = ArgUserType,
+	typename ArgAdapterType = ArgUserType>
 struct ArgumentMarshalerImpl
 {
-	typedef TUserType UserType;
-	typedef TWireType WireType;
-	static inline const wchar_t * GetTypeText()
-	{
-		static const wchar_t typeText[] = { TypeChar1, TypeChar2, 0 };
-		return typeText;
-	}
-	static inline TAdapterType Marshal(WireType arg)
+	typedef ArgUserType UserType;
+	typedef ArgWireType WireType;
+	static inline ArgAdapterType Marshal(ArgWireType arg)
 	{
 		return arg;
 	}
-	typedef typename std::conditional<TypeChar2 == 0, 
-		Sequence<wchar_t, TypeChar1>,
-		Sequence<wchar_t, TypeChar1, TypeChar2>>::type TypeTextSequence;
 };
 
 #define IMPLEMENT_ARGUMENT_MARSHALER(UserType, ...) \
@@ -148,15 +99,15 @@ struct ArgumentMarshalerImpl
 // Primitive type marshalling
 //
 
-IMPLEMENT_ARGUMENT_MARSHALER(double, 'B');
-IMPLEMENT_ARGUMENT_MARSHALER(int, 'J');
+IMPLEMENT_ARGUMENT_MARSHALER(double);
+IMPLEMENT_ARGUMENT_MARSHALER(int);
 
 //
 // String marshalling
 //
 
-IMPLEMENT_ARGUMENT_MARSHALER(const wchar_t *, 'C', '%');
-IMPLEMENT_ARGUMENT_MARSHALER(std::wstring, 'C', '%', LPCWSTR);
+IMPLEMENT_ARGUMENT_MARSHALER(const wchar_t *);
+IMPLEMENT_ARGUMENT_MARSHALER(std::wstring, LPCWSTR);
 IMPLEMENT_ARGUMENT_MARSHALER_AS(const std::wstring &, std::wstring);
 
 class UnicodeToAnsiAdapter
@@ -201,7 +152,7 @@ public:
 // In Excel 2007 and later, if a string argument is declared as char*, then
 // at most 255 bytes can be passed, or #VALUE! is returned. Therefore we 
 // always marshal a string as wchar_t*.
-IMPLEMENT_ARGUMENT_MARSHALER(const char *, 'C', '%', LPCWSTR, UnicodeToAnsiAdapter);
+IMPLEMENT_ARGUMENT_MARSHALER(const char *, LPCWSTR, UnicodeToAnsiAdapter);
 
 //
 // VARIANT marshalling
@@ -233,7 +184,7 @@ public:
 	operator VARIANT*() { return &m_value; }
 };
 
-IMPLEMENT_ARGUMENT_MARSHALER(VARIANT*, 'Q', 0, LPXLOPER12, VariantAdapter);
+IMPLEMENT_ARGUMENT_MARSHALER(VARIANT*, LPXLOPER12, VariantAdapter);
 
 //
 // SAFEARRAY marshalling
@@ -266,7 +217,7 @@ public:
 	operator SAFEARRAY*() { return psa; }
 };
 
-IMPLEMENT_ARGUMENT_MARSHALER(SAFEARRAY*, 'Q', 0, LPXLOPER12, SafeArrayAdapter);
+IMPLEMENT_ARGUMENT_MARSHALER(SAFEARRAY*, LPXLOPER12, SafeArrayAdapter);
 
 //template <typename T> struct ArgumentWrapper<T &> : ArgumentWrapper < T > {};
 //template <typename T> struct ArgumentWrapper<T &&> : ArgumentWrapper < T > {};

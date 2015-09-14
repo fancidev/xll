@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <array>
+#include "TypeText.h"
 
 namespace XLL_NAMESPACE
 {
@@ -106,6 +107,7 @@ namespace XLL_NAMESPACE
 		}
 	};
 
+#if 0
 	template <typename Func> class FunctionInfoFactory;
 
 	template <typename TRet, typename... TArgs>
@@ -138,5 +140,6 @@ namespace XLL_NAMESPACE
 		: public FunctionInfoFactory<TRet(TArgs...)>
 	{
 	};
+#endif
 #endif
 }

@@ -1,6 +1,6 @@
 #include "XllAddin.h"
 
-std::wstring VariantType(VARIANTARG *pv)
+std::wstring VariantType(VARIANTARG *pv, VARIANTARG *pv2)
 {
 	switch (V_VT(pv))
 	{

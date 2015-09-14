@@ -128,6 +128,7 @@
     <ClInclude Include="ExcelVariant.h" />
     <ClInclude Include="FunctionInfo.h" />
     <ClInclude Include="Invoke.h" />
+    <ClInclude Include="TypeText.h" />
     <ClInclude Include="XLCALL.H" />
     <ClInclude Include="XllAddin.h" />
     <ClInclude Include="xlldef.h" />
