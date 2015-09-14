@@ -72,30 +72,16 @@ namespace XLL_NAMESPACE
 	DEFINE_TYPE_TEXT(int32_t*, 'N');
 	DEFINE_TYPE_TEXT(LPXLOPER12, 'Q');
 
-#if 1
-	// VC++ is not able to find the following specializations. Don't know why.
 	template <typename TRet, typename... TArgs>
 	struct TypeText < TRet __stdcall(TArgs...) >
 	{
 		typedef typename Concat < char,
 			typename TypeText<typename TRet>::SeqTypeA,
-			typename TypeText<typename TArgs>::SeqTypeA... > ::type SeqTypeA;
+			typename TypeText<typename TArgs>::SeqTypeA...,
+			Sequence<char, 0> > ::type SeqTypeA;
 		typedef typename Concat < wchar_t,
 			typename TypeText<typename TRet>::SeqTypeW,
-			typename TypeText<typename TArgs>::SeqTypeW... > ::type SeqTypeW;
+			typename TypeText<typename TArgs>::SeqTypeW...,
+			Sequence<wchar_t, 0 > > ::type SeqTypeW;
 	};
-	template <typename TRet, typename... TArgs>
-	struct TypeText < TRet(TArgs...) > : TypeText < TRet __stdcall(TArgs...) > {};
-#endif
-
-	template <typename TRet, typename... TArgs>
-	inline const wchar_t * GetTypeText()
-	{
-		typedef typename Concat<wchar_t,
-			//typename TypeText<typename ArgumentMarshaler<TRet>::WireType>::SeqTypeW,
-			Sequence<wchar_t, 'Q'>,
-			typename TypeText<typename ArgumentMarshaler<TArgs>::WireType>::SeqTypeW...,
-			Sequence<wchar_t, 0 >> ::type seq_type;
-		return seq_type::ToArray();
-	}
 }

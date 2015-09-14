@@ -88,22 +88,14 @@ XLL_END_NAMESPACE
 		static LPXLOPER12 __stdcall Call(typename ::XLL_NAMESPACE::ArgumentMarshaler<TArgs>::WireType... args) \
 		{ \
 			__pragma(comment(linker, "/export:" XLL_WRAPPER_PREFIX #f "=" __FUNCDNAME__)) \
-			__pragma(comment(linker, "/include:" __FUNCDNAME__)) \
 			return ::XLL_NAMESPACE::XLWrapperImpl<decltype(f), f, TRet, TArgs...>(args...); \
 		} \
 		static const wchar_t * GetTypeText() \
 		{ \
-			return ::XLL_NAMESPACE::GetTypeText<TRet,TArgs...>(); \
+			auto &r = Call; \
+			return ::XLL_NAMESPACE::TypeText<std::remove_reference<decltype(r)>::type>::SeqTypeW::ToArray(); \
 		} \
 	}; \
-	typedef XLWrapper_##f<::XLL_NAMESPACE::StripCallingConvention<decltype(f)>::type> XLWrapperType_##f; \
-	static auto& XLWrapper_Call_##f = XLWrapperType_##f::Call; \
 	static ::XLL_NAMESPACE::FunctionInfoBuilder XLFun_##f = ::XLL_NAMESPACE::AddFunction( \
 		::XLL_NAMESPACE::FunctionInfo(XLWrapper_##f<::XLL_NAMESPACE::StripCallingConvention<decltype(f)>::type>::GetTypeText(), \
 		XLL_CONCAT(L,XLL_WRAPPER_PREFIX) L#f)).Name(L#f)
-
-//static auto XLWrapper_Call_##f = XLWrapperType_##f::Call; \
-//typedef XLWrapper_##f<::XLL_NAMESPACE::StripCallingConvention<decltype(f)>::type> XLWrapperType_##f; \
-//static const wchar_t * XLWrapper_TypeText_##f = ::XLL_NAMESPACE::TypeText<decltype(XLWrapperType_##f::Call)>::SeqTypeW::ToArray(); \
-//	static ::XLL_NAMESPACE::FunctionInfoBuilder XLFun_##f = ::XLL_NAMESPACE::AddFunction( \
-//		::XLL_NAMESPACE::FunctionInfo(XLWrapper_TypeText_##f, XLL_CONCAT(L,XLL_WRAPPER_PREFIX) L#f)).Name(L#f)
