@@ -1,0 +1,5 @@
+////////////////////////////////////////////////////////////////////////////
+// Test.cpp
+//
+// This file contains adhoc experimenting code in the working copy.
+// The file is always empty in git.
