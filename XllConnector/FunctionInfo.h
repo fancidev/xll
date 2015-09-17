@@ -60,6 +60,14 @@ namespace XLL_NAMESPACE
 			registry().emplace_back(typeText, entryPoint);
 			return registry().back();
 		}
+
+		template <typename TRet, typename... TArgs>
+		static FunctionInfo& Create(TRet(__stdcall *func)(TArgs...))
+		{
+			const wchar_t *typeText = GetTypeTextImpl<wchar_t>(func);
+			registry().emplace_back(typeText, nullptr);
+			return registry().back();
+		}
 	};
 
 	class FunctionInfoBuilder

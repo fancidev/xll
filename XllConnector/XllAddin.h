@@ -5,4 +5,4 @@
 #include "Invoke.h"
 #include "ExcelVariant.h"
 #include "Marshal.h"
-#include "Addin.h"
+#include "Wrapper.h"

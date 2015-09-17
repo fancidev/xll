@@ -122,13 +122,13 @@
     <ClCompile Include="XLCALL.CPP" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Addin.h" />
     <ClInclude Include="Marshal.h" />
     <ClInclude Include="Conversion.h" />
     <ClInclude Include="ExcelVariant.h" />
     <ClInclude Include="FunctionInfo.h" />
     <ClInclude Include="Invoke.h" />
     <ClInclude Include="TypeText.h" />
+    <ClInclude Include="Wrapper.h" />
     <ClInclude Include="XLCALL.H" />
     <ClInclude Include="XllAddin.h" />
     <ClInclude Include="xlldef.h" />
