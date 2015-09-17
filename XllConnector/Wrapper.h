@@ -185,6 +185,7 @@ namespace XLL_NAMESPACE
 #define XLL_QUOTE(x) XLL_QUOTE_(x)
 #define XLL_LQUOTE(x) XLL_CONCAT(L,XLL_QUOTE(x))
 
+#if 0
 #define EXPORT_XLL_FUNCTION(f) \
 	template <void *func, typename WireRet, typename... WireArgs> \
 	struct EntryPoint_##f \
@@ -198,3 +199,17 @@ namespace XLL_NAMESPACE
 	static auto XLL_CONCAT(XLFIB_,f) = ::XLL_NAMESPACE::XLWrapper \
 		< XLL_CONCAT(EntryPoint_,f), decltype(f), f > \
 		::Register(XLL_LQUOTE(XLL_WRAPPER_PREFIX) XLL_LQUOTE(f), XLL_LQUOTE(f))
+#else
+#define EXPORT_XLL_FUNCTION(f) \
+	template <void *func, typename WireRet, typename... WireArgs> \
+	struct EntryPoint_##f \
+	{ \
+		static __declspec(dllexport) WireRet __stdcall EntryPoint(WireArgs... args) \
+		{ \
+			return static_cast<WireRet(__stdcall*)(WireArgs...)>(func)(args...); \
+		} \
+	}; \
+	static auto XLL_CONCAT(XLFIB_,f) = ::XLL_NAMESPACE::XLWrapper \
+		< XLL_CONCAT(EntryPoint_,f), decltype(f), f > \
+		::Register(nullptr, XLL_LQUOTE(f))
+#endif

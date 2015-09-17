@@ -27,6 +27,7 @@ namespace XLL_NAMESPACE
 
 	struct FunctionInfo
 	{
+		FARPROC proc;
 		LPCWSTR entryPoint;
 		std::wstring typeText;
 
@@ -41,9 +42,10 @@ namespace XLL_NAMESPACE
 		bool isPure;
 		bool isThreadSafe;
 
-		FunctionInfo(LPCWSTR typeText, LPCWSTR entryPoint)
-			: typeText(typeText), entryPoint(entryPoint), name(), description(),
-			macroType(1), category(), shortcut(), helpTopic(), isPure(), isThreadSafe()
+		FunctionInfo(LPCWSTR typeText, LPCWSTR entryPoint, FARPROC procedure)
+			: proc(procedure), typeText(typeText), entryPoint(entryPoint),
+			name(), description(), macroType(1), category(), shortcut(), 
+			helpTopic(), isPure(), isThreadSafe()
 		{
 		}
 
@@ -54,18 +56,10 @@ namespace XLL_NAMESPACE
 		}
 
 		template <typename TRet, typename... TArgs>
-		static FunctionInfo& Create(TRet(__stdcall *func)(TArgs...), LPCWSTR entryPoint)
-		{
-			const wchar_t *typeText = GetTypeTextImpl<wchar_t>(func);
-			registry().emplace_back(typeText, entryPoint);
-			return registry().back();
-		}
-
-		template <typename TRet, typename... TArgs>
 		static FunctionInfo& Create(TRet(__stdcall *func)(TArgs...))
 		{
 			const wchar_t *typeText = GetTypeTextImpl<wchar_t>(func);
-			registry().emplace_back(typeText, nullptr);
+			registry().emplace_back(typeText, nullptr, (FARPROC)func);
 			return registry().back();
 		}
 	};

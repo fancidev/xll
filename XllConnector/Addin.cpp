@@ -4,6 +4,7 @@
 #include "xlldef.h"
 #include "FunctionInfo.h"
 #include "ExcelVariant.h"
+#include "Conversion.h"
 #include <vector>
 #include <cassert>
 
@@ -15,6 +16,34 @@ namespace XLL_NAMESPACE
 }
 
 using namespace XLL_NAMESPACE;
+
+static HMODULE GetThisModuleHandle()
+{
+	HMODULE hThisDll;
+	if (::GetModuleHandleEx(
+		 GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS
+		|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+		(LPCTSTR)(void*)(&GetThisModuleHandle), &hThisDll))
+	{
+		return hThisDll;
+	}
+	return NULL;
+}
+
+static WORD GetOrdinalByAddress(FARPROC entryPoint)
+{
+	static HMODULE hThisDll = GetThisModuleHandle();
+	// todo: should cache
+	for (WORD ord = 1; ord != 0; ++ord)
+	{
+		FARPROC proc = ::GetProcAddress(hThisDll, MAKEINTRESOURCEA(ord));
+		if (proc == NULL)
+			return 0;
+		if (proc == entryPoint)
+			return ord;
+	}
+	return 0;
+}
 
 static int RegisterFunction(LPXLOPER12 dllName, const FunctionInfo &f)
 {
@@ -34,7 +63,17 @@ static int RegisterFunction(LPXLOPER12 dllName, const FunctionInfo &f)
 
 	ExcelVariant opers[256];
 	// opers[0] = dllName;
-	opers[1] = f.entryPoint;
+	if (f.entryPoint == nullptr)
+	{
+		WORD ordinal = GetOrdinalByAddress(f.proc);
+		if (ordinal == 0)
+			return xlretFailed;
+		opers[1] = ordinal;
+	}
+	else
+	{
+		opers[1] = f.entryPoint;
+	}
 	opers[2] = f.typeText + (f.isPure ? L"" : L"!") + (f.isThreadSafe ? L"$" : L"");
 	opers[3] = f.name;
 	// BUG: if the function description is given, then even if the UDF takes
@@ -81,6 +120,29 @@ static int RegisterFunction(LPXLOPER12 dllName, const FunctionInfo &f)
 	return ret;
 }
 
+#if 0
+static int RegisterFunctionTest(LPXLOPER12 dllName)
+{
+	const int N = 6;
+
+	XLOPER12 opers[N];
+	xll::SetValue(&opers[1], 1.0); // entry point ordinal
+	xll::SetValue(&opers[2], L"C!");
+	xll::SetValue(&opers[3], L"MagicString"); // name
+	xll::SetValue(&opers[4], L""); // arguments
+	xll::SetValue(&opers[5], 1.0); // macro type
+
+	LPXLOPER12 popers[N];
+	popers[0] = dllName;
+	for (size_t i = 1; i < N; i++)
+		popers[i] = &opers[i];
+
+	XLOPER12 id;
+	int ret = Excel12v(xlfRegister, &id, N, popers);
+	return ret;
+}
+#endif
+
 // http://blogs.msdn.com/b/oldnewthing/archive/2014/03/21/10509670.aspx
 // The DLL that links to this LIB must reference some symbol within this
 // file to make this OBJ file into the final image. Otherwise the OBJ
@@ -100,6 +162,7 @@ int WINAPI xlAutoOpen()
 		{
 			RegisterFunction(&xDLL, f);
 		}
+		// RegisterFunctionTest(&xDLL);
 		Excel12(xlFree, 0, 1, &xDLL);
 	}
 	return 1;
