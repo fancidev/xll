@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////
-// Wrapper.h -- type-safe wrapper to expose user functions to Excel
+// Wrapper.h -- type-safe wrapper to expose user-defined functions to Excel
 
 #pragma once
 
@@ -15,18 +15,6 @@ namespace XLL_NAMESPACE
 	//
 	// Removes the calling convention from a function type.
 	//                
-
-#ifndef _WIN64
-#define XLL_HAVE_CDECL      1
-#define XLL_HAVE_STDCALL    1
-#define XLL_HAVE_FASTCALL   1
-#define XLL_HAVE_VECTORCALL 0
-#else
-#define XLL_HAVE_CDECL      1
-#define XLL_HAVE_STDCALL    0
-#define XLL_HAVE_FASTCALL   0
-#define XLL_HAVE_VECTORCALL 1
-#endif
 
 	template <typename Func> struct StripCallingConvention;
 
@@ -62,8 +50,11 @@ namespace XLL_NAMESPACE
 	};
 #endif
 
-	//template <typename Func>
-	//using strip_cc_t = typename StripCallingConvention<Func>::type;
+	// todo: possible to use template technique to remove the
+	// macros ? (like _is_same?)
+
+	template <typename Func>
+	using strip_cc_t = typename StripCallingConvention<Func>::type;
 
 
 	//
@@ -90,40 +81,36 @@ namespace XLL_NAMESPACE
 		return p;
 #endif
 	}
+}
 
+namespace XLL_NAMESPACE
+{
 	//
-	// XLWrapper<...>
+	// XLSimpleWrapper<Func, func>
 	//
-	// Actual implementation of UDF wrappers. This is used together with
-	// EntryPointHolder structs, which contains a single entry point
-	// function that is exported with a pretty name.
+	// Simple UDF wrapper that 
+	//   1) takes care of argument and return value marshalling, and
+	//   2) provide a __stdcall entry point for Excel to call.
+	//
+	// The entry point is exported by decorated name. If you don't want
+	// your internal name to appear as part of the decoration, simply
+	// don't export your name (then it won't go into the signature).
 	// 
 
-	template <template <void *, typename, typename...> class EntryPointHolder,
-		typename Func,
-		Func *func,
-		typename = typename StripCallingConvention<Func>::type>
-	struct XLWrapper;
+	// todo: inherit from XLSimpleWrapper to have one less parameter argument
+	template <typename Func, Func *func, typename = strip_cc_t<Func> >
+	struct XLSimpleWrapper;
 
-	template <template <void *, typename, typename...> class EntryPointHolder,
-		typename Func,
-		Func *func,
-		typename TRet,
-		typename... TArgs>
-	struct XLWrapper < EntryPointHolder, Func, func, TRet(TArgs...) >
+	template <typename Func, Func *func, typename TRet, typename... TArgs>
+	struct XLSimpleWrapper < Func, func, TRet(TArgs...) >
 	{
-		// Type of the entry point of the wrapped UDF.
-		typedef LPXLOPER12(__stdcall EntryPointType)
-			(typename ArgumentMarshaler<TArgs>::WireType...);
-
-		// Actual implementation of the wrapper.
-		static inline LPXLOPER12 __stdcall Call(
+		static __declspec(dllexport) LPXLOPER12 __stdcall EntryPoint(
 			typename ArgumentMarshaler<TArgs>::WireType... args)
 		{
 			try
 			{
-				LPXLOPER12 pvRetVal = xll::getReturnValue();
-				HRESULT hr = xll::SetValue(pvRetVal,
+				LPXLOPER12 pvRetVal = getReturnValue();
+				HRESULT hr = SetValue(pvRetVal,
 					func(ArgumentMarshaler<TArgs>::Marshal(args)...));
 				if (FAILED(hr))
 				{
@@ -143,28 +130,9 @@ namespace XLL_NAMESPACE
 			return const_cast<ExcelVariant*>(&ExcelVariant::ErrValue);
 		}
 
-		// Returns the entry point address of the UDF wrapper. This function
-		// must be called somewhere to emit the entry point into object file.
-		static inline EntryPointType* GetEntryPoint()
-		{
-			return EntryPointHolder < Call, LPXLOPER12,
-				typename ArgumentMarshaler<TArgs>::WireType... > ::EntryPoint;
-		}
-
-		// Register the wrapper in the XLL's list of UDFs.
-		static inline FunctionInfoBuilder Register(LPCWSTR entryPoint, LPCWSTR name)
-		{
-			//Reference(GetEntryPoint());
-			xll::FunctionInfo& info = GetFunctionInfo();
-			info.entryPoint = entryPoint;
-			info.name = name;
-			return xll::FunctionInfoBuilder(info);
-		}
-
-	private:
 		static inline FunctionInfo& GetFunctionInfo()
 		{
-			static FunctionInfo& s_info = FunctionInfo::Create(GetEntryPoint());
+			static FunctionInfo& s_info = FunctionInfo::Create(EntryPoint);
 			return s_info;
 		}
 	};
@@ -179,37 +147,7 @@ namespace XLL_NAMESPACE
 // *) The macro may be put in any namespace.
 //
 
-#define XLL_CONCAT_(x,y) x##y
-#define XLL_CONCAT(x,y) XLL_CONCAT_(x,y)
-#define XLL_QUOTE_(x) #x
-#define XLL_QUOTE(x) XLL_QUOTE_(x)
-#define XLL_LQUOTE(x) XLL_CONCAT(L,XLL_QUOTE(x))
-
-#if 0
 #define EXPORT_XLL_FUNCTION(f) \
-	template <void *func, typename WireRet, typename... WireArgs> \
-	struct EntryPoint_##f \
-	{ \
-		static inline WireRet __stdcall EntryPoint(WireArgs... args) \
-		{ \
-			__pragma(comment(linker, "/export:" XLL_QUOTE(XLL_WRAPPER_PREFIX) XLL_QUOTE(f) "=" __FUNCDNAME__)) \
-			return static_cast<WireRet(__stdcall*)(WireArgs...)>(func)(args...); \
-		} \
-	}; \
-	static auto XLL_CONCAT(XLFIB_,f) = ::XLL_NAMESPACE::XLWrapper \
-		< XLL_CONCAT(EntryPoint_,f), decltype(f), f > \
-		::Register(XLL_LQUOTE(XLL_WRAPPER_PREFIX) XLL_LQUOTE(f), XLL_LQUOTE(f))
-#else
-#define EXPORT_XLL_FUNCTION(f) \
-	template <void *func, typename WireRet, typename... WireArgs> \
-	struct EntryPoint_##f \
-	{ \
-		static __declspec(dllexport) WireRet __stdcall EntryPoint(WireArgs... args) \
-		{ \
-			return static_cast<WireRet(__stdcall*)(WireArgs...)>(func)(args...); \
-		} \
-	}; \
-	static auto XLL_CONCAT(XLFIB_,f) = ::XLL_NAMESPACE::XLWrapper \
-		< XLL_CONCAT(EntryPoint_,f), decltype(f), f > \
-		::Register(nullptr, XLL_LQUOTE(f))
-#endif
+	static auto XLWrapperInfo_##f = ::XLL_NAMESPACE::FunctionInfoBuilder( \
+		::XLL_NAMESPACE::XLSimpleWrapper<decltype(f),f>::GetFunctionInfo()) \
+		.Name(L#f)
