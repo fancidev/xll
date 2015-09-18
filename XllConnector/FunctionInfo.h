@@ -10,6 +10,8 @@
 #include <array>
 #include "TypeText.h"
 
+// TODO: it makes more sense to put typetext inside this file?
+
 namespace XLL_NAMESPACE
 {
 	class NameDescriptionPair
@@ -27,9 +29,9 @@ namespace XLL_NAMESPACE
 
 	struct FunctionInfo
 	{
-		FARPROC proc;
-		LPCWSTR entryPoint;
-		std::wstring typeText;
+		FARPROC entryPoint;
+		//LPCWSTR entryPoint;
+		LPCWSTR typeText;
 
 		LPCWSTR name;
 		LPCWSTR description;
@@ -42,8 +44,8 @@ namespace XLL_NAMESPACE
 		bool isPure;
 		bool isThreadSafe;
 
-		FunctionInfo(LPCWSTR typeText, LPCWSTR entryPoint, FARPROC procedure)
-			: proc(procedure), typeText(typeText), entryPoint(entryPoint),
+		FunctionInfo(FARPROC entryPoint, LPCWSTR typeText)
+			: entryPoint(entryPoint), typeText(typeText),
 			name(), description(), macroType(1), category(), shortcut(), 
 			helpTopic(), isPure(), isThreadSafe()
 		{
@@ -59,7 +61,7 @@ namespace XLL_NAMESPACE
 		static FunctionInfo& Create(TRet(__stdcall *func)(TArgs...))
 		{
 			const wchar_t *typeText = GetTypeTextImpl<wchar_t>(func);
-			registry().emplace_back(typeText, nullptr, (FARPROC)func);
+			registry().emplace_back((FARPROC)func, typeText);
 			return registry().back();
 		}
 	};

@@ -101,6 +101,10 @@ namespace XLL_NAMESPACE
 	template <typename Func, Func *func, typename TRet, typename... TArgs>
 	struct XLWrapper < Func, func, TRet(TArgs...) >
 	{
+		static_assert(
+			sizeof...(TArgs) <= XLL_MAX_ARG_COUNT,
+			"Your UDF takes too many arguments.");
+
 		static __declspec(dllexport) LPXLOPER12 __stdcall EntryPoint(
 			typename ArgumentMarshaler<TArgs>::WireType... args)
 		{

@@ -30,25 +30,73 @@ static HMODULE GetThisModuleHandle()
 	return NULL;
 }
 
-static WORD GetOrdinalByAddress(FARPROC entryPoint)
+class ExportTableHelper
 {
-	static HMODULE hThisDll = GetThisModuleHandle();
-	// todo: should cache
-	for (WORD ord = 1; ord != 0; ++ord)
+	struct ExportEntry
 	{
-		FARPROC proc = ::GetProcAddress(hThisDll, MAKEINTRESOURCEA(ord));
-		if (proc == NULL)
-			return 0;
-		if (proc == entryPoint)
-			return ord;
+		FARPROC proc;
+		WORD ordinal;
+		LPCSTR name;
+	};
+
+	std::vector<ExportEntry> m_exportEntries; // todo: handle exceptions
+
+public:
+	ExportTableHelper(HMODULE hModule)
+	{
+		BYTE* pImageBase = (BYTE*)hModule;
+		PIMAGE_DOS_HEADER pDosHeader = (PIMAGE_DOS_HEADER)hModule;
+		if (pDosHeader->e_magic != IMAGE_DOS_SIGNATURE)
+			return;
+
+		PIMAGE_NT_HEADERS pNtHeaders = (PIMAGE_NT_HEADERS)&pImageBase[pDosHeader->e_lfanew];
+		if (pNtHeaders->Signature != IMAGE_NT_SIGNATURE)
+			return;
+		if (pNtHeaders->OptionalHeader.NumberOfRvaAndSizes == 0)
+			return;
+
+		PIMAGE_EXPORT_DIRECTORY pExportDirectory = (PIMAGE_EXPORT_DIRECTORY)
+			&pImageBase[pNtHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress];
+
+		DWORD *pFunctionRVAs = (DWORD*)&pImageBase[pExportDirectory->AddressOfFunctions];
+		for (DWORD i = 0; i < pExportDirectory->NumberOfFunctions; ++i)
+		{
+			if (pFunctionRVAs[i] != 0)
+			{
+				ExportEntry ent;
+				ent.name = nullptr;
+				ent.proc = (FARPROC)&pImageBase[pFunctionRVAs[i]];
+				ent.ordinal = pExportDirectory->Base + i;
+				m_exportEntries.push_back(ent);
+			}
+		}
+		
+		DWORD* pNameRVAs = (DWORD*)&pImageBase[pExportDirectory->AddressOfNames];
+		for (DWORD i = 0; i < pExportDirectory->NumberOfNames; i++)
+		{
+			LPCSTR name = (LPCSTR)&pImageBase[pNameRVAs[i]];
+		}
+
+		// Sort the entries by proc address to make it easier to search.
 	}
-	return 0;
-}
+
+	WORD GetProcOrdinal(FARPROC proc)
+	{
+		for (size_t i = 0; i < m_exportEntries.size(); ++i)
+		{
+			if (m_exportEntries[i].proc == proc)
+				return m_exportEntries[i].ordinal;
+		}
+		return 0;
+	}
+};
+
+static ExportTableHelper exportTable(GetThisModuleHandle());
 
 static int RegisterFunction(LPXLOPER12 dllName, const FunctionInfo &f)
 {
-	if (f.arguments.size() > 245)
-		throw std::invalid_argument("Too many arguments");
+	// This is enforced by a static_assert in XLWrapper.
+	assert(f.arguments.size() <= XLL_MAX_ARG_COUNT);
 
 	std::wstring argumentText;
 	if (f.arguments.size() > 0)
@@ -63,18 +111,15 @@ static int RegisterFunction(LPXLOPER12 dllName, const FunctionInfo &f)
 
 	ExcelVariant opers[256];
 	// opers[0] = dllName;
-	if (f.entryPoint == nullptr)
-	{
-		WORD ordinal = GetOrdinalByAddress(f.proc);
-		if (ordinal == 0)
-			return xlretFailed;
-		opers[1] = ordinal;
-	}
-	else
-	{
-		opers[1] = f.entryPoint;
-	}
-	opers[2] = f.typeText + (f.isPure ? L"" : L"!") + (f.isThreadSafe ? L"$" : L"");
+
+	// Find ordinal of entry point. We may support export by name
+	// in the future.
+	WORD ordinal = exportTable.GetProcOrdinal(f.entryPoint);
+	if (ordinal == 0)
+		return xlretFailed;
+	opers[1] = ordinal;
+
+	opers[2] = std::wstring(f.typeText) + (f.isPure ? L"" : L"!") + (f.isThreadSafe ? L"$" : L"");
 	opers[3] = f.name;
 	// BUG: if the function description is given, then even if the UDF takes
 	//      no arguments, Excel still shows a box to let the user input the
