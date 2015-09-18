@@ -8,27 +8,34 @@
 #include "Conversion.h"
 #include "Marshal.h"
 
+//
+// strip_cc, strip_cc_t
+//
+// Removes explicit calling convention from a function type.
+//
+// strip_cc<Func>::type removes any explicit calling convention from
+// the function type Func, producing a function type with the default
+// calling convention. The default calling convention can be altered
+// by compiler switches /Gd, /Gr, /Gv, or /Gz.
+//
+// strip_cc_t<Func> is shorthand for strip_cc<Func>::type.
+//
+
 namespace XLL_NAMESPACE
 {
-	//
-	// StripCallingConvention<Func>
-	//
-	// Removes the calling convention from a function type.
-	//                
-
-	template <typename Func, typename = void> struct StripCallingConvention;
+	template <typename Func, typename = void> struct strip_cc;
 
 	template <int> struct Placeholder;
 
 	template <typename TRet, typename... TArgs>
-	struct StripCallingConvention < TRet(TArgs...), void >
+	struct strip_cc < TRet(TArgs...), void >
 	{
 		typedef TRet type(TArgs...);
 	};
 
 #define XLL_DEFINE_STRIP_CC(n, cc) \
 	template <typename TRet, typename... TArgs> \
-	struct StripCallingConvention <TRet cc(TArgs...), std::conditional_t< \
+	struct strip_cc <TRet cc(TArgs...), std::conditional_t< \
 		std::is_same< TRet cc(TArgs...), TRet(TArgs...)>::value, \
 		Placeholder<n>, void > > \
 		{ \
@@ -41,7 +48,7 @@ namespace XLL_NAMESPACE
 	XLL_DEFINE_STRIP_CC(3, __vectorcall);
 
 	template <typename Func>
-	using strip_cc_t = typename StripCallingConvention<Func>::type;
+	using strip_cc_t = typename strip_cc<Func>::type;
 }
 
 namespace XLL_NAMESPACE
@@ -72,20 +79,20 @@ namespace XLL_NAMESPACE
 	}
 }
 
+//
+// XLWrapper
+//
+// UDF wrapper that
+//   1) handles argument and return value marshalling, and
+//   2) provides a __stdcall entry point for Excel to call.
+//
+// The entry point is exported by decorated name. If you do not want
+// your internal name to appear as part of the decoration, do not
+// export your name.
+// 
+
 namespace XLL_NAMESPACE
 {
-	//
-	// XLSimpleWrapper<Func, func>
-	//
-	// Simple UDF wrapper that 
-	//   1) takes care of argument and return value marshalling, and
-	//   2) provide a __stdcall entry point for Excel to call.
-	//
-	// The entry point is exported by decorated name. If you don't want
-	// your internal name to appear as part of the decoration, simply
-	// don't export your name (then it won't go into the signature).
-	// 
-
 	// TODO: Find some way to have one less template parameter (to make
 	// export table prettier. Might need to use tuples.
 	template <typename Func, Func *func, typename = strip_cc_t<Func> >
@@ -129,12 +136,16 @@ namespace XLL_NAMESPACE
 }
 
 //
-// Macro to create and export a wrapper for UDF. Requirements:
+// EXPORT_XLL_FUNCTION
 //
-// *) The macro must be placed in a source file.
-// *) The macro must refer to a UDF accessible from that source file.
-// *) The UDF must have external linkage.
-// *) The macro may be put in any namespace.
+// Macro to create and export a wrapper for a given UDF.
+//
+// Requirements:
+//
+//   *) The macro must be placed in a source file.
+//   *) The macro must refer to a declared UDF.
+//   *) The UDF must have external linkage.
+//   *) The macro may be put in any namespace.
 //
 
 #define EXPORT_XLL_FUNCTION(f) \
