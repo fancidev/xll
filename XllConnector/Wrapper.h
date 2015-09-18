@@ -16,47 +16,36 @@ namespace XLL_NAMESPACE
 	// Removes the calling convention from a function type.
 	//                
 
-	template <typename Func> struct StripCallingConvention;
+	template <typename Func, typename = void> struct StripCallingConvention;
 
-#if XLL_HAVE_CDECL
+	template <int> struct Placeholder;
+
 	template <typename TRet, typename... TArgs>
-	struct StripCallingConvention < TRet __cdecl(TArgs...) >
+	struct StripCallingConvention < TRet(TArgs...), void >
 	{
 		typedef TRet type(TArgs...);
 	};
-#endif
 
-#if XLL_HAVE_STDCALL
-	template <typename TRet, typename... TArgs>
-	struct StripCallingConvention < TRet __stdcall(TArgs...) >
-	{
-		typedef TRet type(TArgs...);
-	};
-#endif
+#define XLL_DEFINE_STRIP_CC(n, cc) \
+	template <typename TRet, typename... TArgs> \
+	struct StripCallingConvention <TRet cc(TArgs...), std::conditional_t< \
+		std::is_same< TRet cc(TArgs...), TRet(TArgs...)>::value, \
+		Placeholder<n>, void > > \
+		{ \
+		typedef TRet type(TArgs...); \
+		}
 
-#if XLL_HAVE_FASTCALL
-	template <typename TRet, typename... TArgs>
-	struct StripCallingConvention < TRet __fastcall(TArgs...) >
-	{
-		typedef TRet type(TArgs...);
-	};
-#endif
-
-#if XLL_HAVE_VECTORCALL
-	template <typename TRet, typename... TArgs>
-	struct StripCallingConvention < TRet __vectorcall(TArgs...) >
-	{
-		typedef TRet type(TArgs...);
-	};
-#endif
-
-	// todo: possible to use template technique to remove the
-	// macros ? (like _is_same?)
+	XLL_DEFINE_STRIP_CC(0, __cdecl);
+	XLL_DEFINE_STRIP_CC(1, __stdcall);
+	XLL_DEFINE_STRIP_CC(2, __fastcall);
+	XLL_DEFINE_STRIP_CC(3, __vectorcall);
 
 	template <typename Func>
 	using strip_cc_t = typename StripCallingConvention<Func>::type;
+}
 
-
+namespace XLL_NAMESPACE
+{
 	//
 	// getReturnValue
 	//
@@ -97,12 +86,13 @@ namespace XLL_NAMESPACE
 	// don't export your name (then it won't go into the signature).
 	// 
 
-	// todo: inherit from XLSimpleWrapper to have one less parameter argument
+	// TODO: Find some way to have one less template parameter (to make
+	// export table prettier. Might need to use tuples.
 	template <typename Func, Func *func, typename = strip_cc_t<Func> >
-	struct XLSimpleWrapper;
+	struct XLWrapper;
 
 	template <typename Func, Func *func, typename TRet, typename... TArgs>
-	struct XLSimpleWrapper < Func, func, TRet(TArgs...) >
+	struct XLWrapper < Func, func, TRet(TArgs...) >
 	{
 		static __declspec(dllexport) LPXLOPER12 __stdcall EntryPoint(
 			typename ArgumentMarshaler<TArgs>::WireType... args)
@@ -149,5 +139,5 @@ namespace XLL_NAMESPACE
 
 #define EXPORT_XLL_FUNCTION(f) \
 	static auto XLWrapperInfo_##f = ::XLL_NAMESPACE::FunctionInfoBuilder( \
-		::XLL_NAMESPACE::XLSimpleWrapper<decltype(f),f>::GetFunctionInfo()) \
+		::XLL_NAMESPACE::XLWrapper<decltype(f),f>::GetFunctionInfo()) \
 		.Name(L#f)

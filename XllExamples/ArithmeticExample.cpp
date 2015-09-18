@@ -5,7 +5,7 @@ int Plus(int a, int b)
 	return a + b;
 }
 
-int Minus(int a, int b)
+int __stdcall Minus(int a, int b)
 {
 	return a - b;
 }
@@ -15,7 +15,7 @@ double GetCircleArea(double r)
 	return 3.1415926 * r * r;
 }
 
-double Square(double x)
+double __fastcall Square(double x)
 {
 	return x * x;
 }

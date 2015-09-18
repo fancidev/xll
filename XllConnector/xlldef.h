@@ -24,15 +24,3 @@
 #define XLL_SUPPORT_THREAD_LOCAL 0
 #endif
 #endif
-
-#ifndef _WIN64
-#define XLL_HAVE_CDECL      1
-#define XLL_HAVE_STDCALL    1
-#define XLL_HAVE_FASTCALL   1
-#define XLL_HAVE_VECTORCALL 0
-#else
-#define XLL_HAVE_CDECL      1
-#define XLL_HAVE_STDCALL    0
-#define XLL_HAVE_FASTCALL   0
-#define XLL_HAVE_VECTORCALL 1
-#endif
