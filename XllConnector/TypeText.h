@@ -4,6 +4,53 @@
 #include <cstdint>
 
 // 
+// NormalizeAttributes
+//
+// Helper class to combine default attributes and explicit attributes
+// to form effective attributes.
+//
+
+#define XLL_NO_MORE_THAN_ONE_BIT_SET(x) ( ((x) & ((x)-1)) == 0 )
+
+namespace XLL_NAMESPACE
+{
+	template <int Attributes = 0>
+	struct NormalizeAttributes
+	{
+		static_assert((Attributes & ~(
+			XLL_VOLATILE | XLL_NOT_VOLATILE |
+			XLL_THREADSAFE | XLL_NOT_THREADSAFE)) == 0,
+			"Unknown attributes specified.");
+
+		static_assert(XLL_NO_MORE_THAN_ONE_BIT_SET(
+			Attributes & (XLL_VOLATILE | XLL_NOT_VOLATILE)),
+			"Only one of XLL_VOLATILE and XLL_NOT_VOLATILE may be set.");
+
+		static_assert(XLL_NO_MORE_THAN_ONE_BIT_SET(
+			Attributes & (XLL_THREADSAFE | XLL_NOT_THREADSAFE)),
+			"Only one of XLL_THREADSAFE and XLL_NOT_THREADSAFE may be set.");
+
+		enum
+		{
+			volatility_value =
+			(Attributes & XLL_VOLATILE) ? XLL_VOLATILE :
+			(Attributes & XLL_NOT_VOLATILE) ? 0 :
+			(XLL_DEFAULT_VOLATILE) ? XLL_VOLATILE : 0
+		};
+
+		enum
+		{
+			threadsafe_value =
+			(Attributes & XLL_THREADSAFE) ? XLL_THREADSAFE :
+			(Attributes & XLL_NOT_THREADSAFE) ? 0 :
+			(XLL_DEFAULT_THREADSAFE) ? XLL_THREADSAFE : 0
+		};
+
+		enum { value = volatility_value | threadsafe_value };
+	};
+}
+
+// 
 // FunctionAttributes
 //
 // Helper class to interpret and validate function attribute constants.
@@ -11,39 +58,15 @@
 
 namespace XLL_NAMESPACE
 {
-#define XLL_NO_MORE_THAN_ONE_BIT_SET(x) ( ((x) & ((x)-1)) == 0 )
-
 	template <int Attributes>
 	struct FunctionAttributes
 	{
-		static_assert((Attributes & ~(
-			XLL_VOLATILE | XLL_NOT_VOLATILE |
-			XLL_THREAD_SAFE | XLL_NOT_THREAD_SAFE)) == 0,
-			"Unknown attributes specified.");
+		static_assert((Attributes & ~(XLL_VOLATILE | XLL_THREADSAFE)) == 0,
+			"Invalid attributes specified.");
 
-		static_assert(XLL_NO_MORE_THAN_ONE_BIT_SET(
-			Attributes & (XLL_VOLATILE | XLL_NOT_VOLATILE)),
-			"Only one of XLL_VOLATILE or XLL_NOT_VOLATILE may be set.");
+		enum { IsVolatile = (Attributes & XLL_VOLATILE) ? 1 : 0 };
 
-		static_assert(XLL_NO_MORE_THAN_ONE_BIT_SET(
-			Attributes & (XLL_THREAD_SAFE | XLL_NOT_THREAD_SAFE)),
-			"Only one of XLL_VOLATILE or XLL_NOT_VOLATILE may be set.");
-
-		enum
-		{
-			IsVolatile =
-				(Attributes & XLL_VOLATILE) ? true :
-				(Attributes & XLL_NOT_VOLATILE) ? false :
-				XLL_DEFAULT_VOLATILE
-		};
-
-		enum
-		{
-			IsThreadSafe =
-				(Attributes & XLL_THREAD_SAFE) ? true :
-				(Attributes & XLL_NOT_THREAD_SAFE) ? false :
-				XLL_DEFAULT_THREAD_SAFE
-		};
+		enum { IsThreadSafe = (Attributes & XLL_THREADSAFE) ? 1 : 0 };
 	};
 }
 

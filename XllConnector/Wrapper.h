@@ -159,5 +159,6 @@ namespace XLL_NAMESPACE
 
 #define EXPORT_XLL_FUNCTION(f,...) \
 	static auto XLWrapperInfo_##f = ::XLL_NAMESPACE::FunctionInfoBuilder( \
-		::XLL_NAMESPACE::XLWrapper<decltype(f),f,__VA_ARGS__>::GetFunctionInfo()) \
-		.Name(L#f)
+		::XLL_NAMESPACE::XLWrapper<decltype(f),f, \
+		::XLL_NAMESPACE::NormalizeAttributes<__VA_ARGS__>::value> \
+		::GetFunctionInfo()).Name(L#f)

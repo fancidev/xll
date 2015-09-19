@@ -24,17 +24,17 @@
 // XLL_[NOT_]THREAD_SAFE to specify the behavior of that UDF.
 //
 
-#define XLL_VOLATILE        1
-#define XLL_NOT_VOLATILE    2
-#define XLL_THREAD_SAFE     4
-#define XLL_NOT_THREAD_SAFE 8
+#define XLL_VOLATILE       1
+#define XLL_THREADSAFE     2
+#define XLL_NOT_VOLATILE   0x10
+#define XLL_NOT_THREADSAFE 0x20
 
 #ifndef XLL_DEFAULT_VOLATILE
 #define XLL_DEFAULT_VOLATILE 1
 #endif
 
-#ifndef XLL_DEFAULT_THREAD_SAFE
-#define XLL_DEFAULT_THREAD_SAFE 0
+#ifndef XLL_DEFAULT_THREADSAFE
+#define XLL_DEFAULT_THREADSAFE 0
 #endif
 
 //

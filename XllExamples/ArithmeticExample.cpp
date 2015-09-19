@@ -37,7 +37,7 @@ namespace
 		.Arg(L"b", L"second number");
 }
 
-EXPORT_XLL_FUNCTION(Minus, XLL_NOT_VOLATILE | XLL_THREAD_SAFE)
+EXPORT_XLL_FUNCTION(Minus, XLL_NOT_VOLATILE | XLL_THREADSAFE)
 .Category(L"Test Functions");
 
 EXPORT_XLL_FUNCTION(Square)
