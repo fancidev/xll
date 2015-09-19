@@ -144,6 +144,12 @@ public:
 		val.num = value;
 	}
 
+	ExcelVariant(unsigned long value)
+	{
+		xltype = xltypeNum;
+		val.num = static_cast<double>(value);
+	}
+
 	ExcelVariant(wchar_t c)
 	{
 		wchar_t *p = (wchar_t*)malloc(sizeof(wchar_t) * 2);

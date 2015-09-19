@@ -7,6 +7,7 @@
 #include "Conversion.h"
 #include <vector>
 #include <cassert>
+#include <algorithm>
 
 namespace XLL_NAMESPACE
 {
@@ -17,83 +18,161 @@ namespace XLL_NAMESPACE
 
 using namespace XLL_NAMESPACE;
 
-static HMODULE GetThisModuleHandle()
-{
-	HMODULE hThisDll;
-	if (::GetModuleHandleEx(
-		 GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS
-		|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-		(LPCTSTR)(void*)(&GetThisModuleHandle), &hThisDll))
-	{
-		return hThisDll;
-	}
-	return NULL;
-}
+#define XLL_NOEXCEPT throw()
+
+//
+// ExportTableHelper
+//
+// Helper class to look up the export symbols of a dll module.
+//
 
 class ExportTableHelper
 {
 	struct ExportEntry
 	{
 		FARPROC proc;
-		WORD ordinal;
+		DWORD ordinal;
 		LPCSTR name;
+
+		ExportEntry() : proc(nullptr), ordinal(0), name(nullptr) {}
+		ExportEntry(FARPROC proc) : proc(proc), ordinal(0), name(nullptr){}
+
+		static bool AddressPred(const ExportEntry &x, const ExportEntry &y)
+		{
+			return x.proc < y.proc;
+		};
 	};
 
-	std::vector<ExportEntry> m_exportEntries; // todo: handle exceptions
+	ExportEntry *m_exportEntries;
+	size_t m_exportEntryCount;
+
+	static BOOL GetThisModuleHandle(HMODULE *phModule) XLL_NOEXCEPT
+	{
+		return ::GetModuleHandleEx(
+			GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+			(LPCTSTR)(void*)(&GetThisModuleHandle),
+			phModule);
+	}
 
 public:
-	ExportTableHelper(HMODULE hModule)
+	ExportTableHelper() XLL_NOEXCEPT
+		: m_exportEntries(nullptr), m_exportEntryCount(0)
 	{
+	}
+
+	ExportTableHelper(ExportTableHelper &&other) XLL_NOEXCEPT
+	{
+		if (&other != this)
+		{
+			other.m_exportEntries = m_exportEntries;
+			other.m_exportEntryCount = m_exportEntryCount;
+			m_exportEntries = nullptr;
+			m_exportEntryCount = 0;
+		}
+	}
+
+	// Clear the loaded symbol table.
+	void ClearSymbols() XLL_NOEXCEPT
+	{
+		free(m_exportEntries);
+		m_exportEntries = nullptr;
+		m_exportEntryCount = 0;
+	}
+
+	~ExportTableHelper() XLL_NOEXCEPT
+	{
+		ClearSymbols();
+	}
+
+	// Load export symbols from a given module.
+	BOOL LoadSymbols(HMODULE hModule) XLL_NOEXCEPT
+	{
+		ClearSymbols();
+
 		BYTE* pImageBase = (BYTE*)hModule;
 		PIMAGE_DOS_HEADER pDosHeader = (PIMAGE_DOS_HEADER)hModule;
 		if (pDosHeader->e_magic != IMAGE_DOS_SIGNATURE)
-			return;
+			return FALSE;
 
 		PIMAGE_NT_HEADERS pNtHeaders = (PIMAGE_NT_HEADERS)&pImageBase[pDosHeader->e_lfanew];
 		if (pNtHeaders->Signature != IMAGE_NT_SIGNATURE)
-			return;
+			return FALSE;
 		if (pNtHeaders->OptionalHeader.NumberOfRvaAndSizes == 0)
-			return;
+			return TRUE;
 
 		PIMAGE_EXPORT_DIRECTORY pExportDirectory = (PIMAGE_EXPORT_DIRECTORY)
 			&pImageBase[pNtHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress];
 
 		DWORD *pFunctionRVAs = (DWORD*)&pImageBase[pExportDirectory->AddressOfFunctions];
+
+		// Count number of exported functions.
+		size_t n = 0;
+		for (DWORD i = 0; i < pExportDirectory->NumberOfFunctions; ++i)
+		{
+			if (pFunctionRVAs[i] != 0)
+				++n;
+		}
+		if (n == 0)
+			return TRUE;
+
+		// Alloc export entries.
+		m_exportEntries = (ExportEntry*)malloc(sizeof(ExportEntry)*n);
+		if (m_exportEntries == nullptr)
+			return FALSE;
+		m_exportEntryCount = n;
+
+		// Load export entries.
+		n = 0;
 		for (DWORD i = 0; i < pExportDirectory->NumberOfFunctions; ++i)
 		{
 			if (pFunctionRVAs[i] != 0)
 			{
-				ExportEntry ent;
-				ent.name = nullptr;
-				ent.proc = (FARPROC)&pImageBase[pFunctionRVAs[i]];
-				ent.ordinal = pExportDirectory->Base + i;
-				m_exportEntries.push_back(ent);
+				m_exportEntries[n].proc = (FARPROC)&pImageBase[pFunctionRVAs[i]];
+				m_exportEntries[n].ordinal = pExportDirectory->Base + i;
+				m_exportEntries[n].name = nullptr;
+				++n;
 			}
 		}
-		
-		DWORD* pNameRVAs = (DWORD*)&pImageBase[pExportDirectory->AddressOfNames];
-		for (DWORD i = 0; i < pExportDirectory->NumberOfNames; i++)
-		{
-			LPCSTR name = (LPCSTR)&pImageBase[pNameRVAs[i]];
-		}
+
+		//DWORD* pNameRVAs = (DWORD*)&pImageBase[pExportDirectory->AddressOfNames];
+		//for (DWORD i = 0; i < pExportDirectory->NumberOfNames; i++)
+		//{
+		//	LPCSTR name = (LPCSTR)&pImageBase[pNameRVAs[i]];
+		//}
 
 		// Sort the entries by proc address to make it easier to search.
+		std::sort(m_exportEntries, m_exportEntries + n, ExportEntry::AddressPred);
+		return TRUE;
 	}
 
-	WORD GetProcOrdinal(FARPROC proc)
+	// Load symbols from the dll or exe module that this code is
+	// linked into.
+	BOOL LoadSymbols() XLL_NOEXCEPT
 	{
-		for (size_t i = 0; i < m_exportEntries.size(); ++i)
+		HMODULE hThisModule;
+		BOOL bOK = GetThisModuleHandle(&hThisModule);
+		if (bOK)
 		{
-			if (m_exportEntries[i].proc == proc)
-				return m_exportEntries[i].ordinal;
+			bOK = LoadSymbols(hThisModule);
+			FreeLibrary(hThisModule);
 		}
-		return 0;
+		return bOK;
+	}
+
+	DWORD GetProcOrdinal(FARPROC proc) const XLL_NOEXCEPT
+	{
+		const ExportEntry *p = std::lower_bound(
+			m_exportEntries, m_exportEntries + m_exportEntryCount,
+			ExportEntry(proc), ExportEntry::AddressPred);
+
+		if (p < m_exportEntries + m_exportEntryCount && p->proc == proc)
+			return p->ordinal;
+		else
+			return 0;
 	}
 };
 
-static ExportTableHelper exportTable(GetThisModuleHandle());
-
-static int RegisterFunction(LPXLOPER12 dllName, const FunctionInfo &f)
+static int RegisterFunction(LPXLOPER12 dllName, const FunctionInfo &f, const ExportTableHelper &exports)
 {
 	// This is enforced by a static_assert in XLWrapper.
 	assert(f.arguments.size() <= XLL_MAX_ARG_COUNT);
@@ -114,7 +193,7 @@ static int RegisterFunction(LPXLOPER12 dllName, const FunctionInfo &f)
 
 	// Find ordinal of entry point. We may support export by name
 	// in the future.
-	WORD ordinal = exportTable.GetProcOrdinal(f.entryPoint);
+	DWORD ordinal = exports.GetProcOrdinal(f.entryPoint);
 	if (ordinal == 0)
 		return xlretFailed;
 	opers[1] = ordinal;
@@ -200,12 +279,16 @@ int WINAPI xlAutoOpen()
 {
 #pragma EXPORT_UNDECORATED_NAME
 
+	ExportTableHelper exports;
+	if (!exports.LoadSymbols())
+		return 0;
+
 	XLOPER12 xDLL;
 	if (Excel12(xlGetName, &xDLL, 0) == xlretSuccess)
 	{
 		for (FunctionInfo &f : XLL_NAMESPACE::FunctionInfo::registry())
 		{
-			RegisterFunction(&xDLL, f);
+			RegisterFunction(&xDLL, f, exports);
 		}
 		// RegisterFunctionTest(&xDLL);
 		Excel12(xlFree, 0, 1, &xDLL);
