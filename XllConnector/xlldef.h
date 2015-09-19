@@ -30,3 +30,11 @@
 //
 
 #define XLL_MAX_ARG_COUNT 245
+
+//
+// XLL_NOEXCEPT
+//
+// Indicates that a function does not throw C++ exception.
+//
+
+#define XLL_NOEXCEPT throw()

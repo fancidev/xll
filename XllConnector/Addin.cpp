@@ -18,8 +18,6 @@ namespace XLL_NAMESPACE
 
 using namespace XLL_NAMESPACE;
 
-#define XLL_NOEXCEPT throw()
-
 //
 // ExportTableHelper
 //

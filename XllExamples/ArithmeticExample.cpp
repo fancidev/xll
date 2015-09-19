@@ -15,6 +15,14 @@ double GetCircleArea(double r)
 	return 3.1415926 * r * r;
 }
 
+namespace
+{
+	double Divide(double a, double b)
+	{
+		return a / b;
+	}
+}
+
 double __fastcall Square(double x)
 {
 	return x * x;
@@ -37,3 +45,5 @@ EXPORT_XLL_FUNCTION(Minus)
 EXPORT_XLL_FUNCTION(Square)
 .Description(L"Returns the square of a number.")
 .Arg(L"x", L"The number to square");
+
+EXPORT_XLL_FUNCTION(Divide);

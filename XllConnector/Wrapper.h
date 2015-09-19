@@ -82,13 +82,19 @@ namespace XLL_NAMESPACE
 //
 // XLWrapper
 //
-// UDF wrapper that
+// Template-based, type-safe UDF wrapper that
 //   1) handles argument and return value marshalling, and
 //   2) provides a __stdcall entry point for Excel to call.
 //
-// The entry point is exported by decorated name. If you do not want
-// your internal name to appear as part of the decoration, do not
-// export your name.
+// By default, the entry point is exported by its decorated name,
+// which contains the name of the underlying function as well as
+// the name of its argument types. If this is a concern to you, 
+// wrap your function in another function that doesn't contain
+// sensitive names.
+//
+// NOTE: In 32-bit build, we may create and export a naked function
+// that contains a single jmp instruction to jump to the true entry
+// point. In 64-bit build, this is not supported by Visual C++.
 // 
 
 namespace XLL_NAMESPACE
@@ -106,7 +112,7 @@ namespace XLL_NAMESPACE
 			"Your UDF takes too many arguments.");
 
 		static __declspec(dllexport) LPXLOPER12 __stdcall EntryPoint(
-			typename ArgumentMarshaler<TArgs>::WireType... args)
+			typename ArgumentMarshaler<TArgs>::WireType... args) XLL_NOEXCEPT
 		{
 			try
 			{
@@ -131,7 +137,7 @@ namespace XLL_NAMESPACE
 			return const_cast<ExcelVariant*>(&ExcelVariant::ErrValue);
 		}
 
-		static inline FunctionInfo& GetFunctionInfo()
+			static inline FunctionInfo& GetFunctionInfo()
 		{
 			static FunctionInfo& s_info = FunctionInfo::Create(EntryPoint);
 			return s_info;
