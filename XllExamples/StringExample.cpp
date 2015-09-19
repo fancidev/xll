@@ -42,7 +42,7 @@ std::wstring ReverseString(const std::wstring &s)
 	return std::wstring(s.crbegin(), s.crend());
 }
 
-EXPORT_XLL_FUNCTION(ReverseString).Pure().ThreadSafe();
+EXPORT_XLL_FUNCTION(ReverseString, XLL_NOT_VOLATILE | XLL_THREAD_SAFE);
 
 // GetTooLongString:
 //   Returns a string of 40,000 characters. The wrapper throws an exception
@@ -52,7 +52,7 @@ std::wstring GetTooLongString()
 	return std::wstring(40000, L'x');
 }
 
-EXPORT_XLL_FUNCTION(GetTooLongString).Pure().ThreadSafe();
+EXPORT_XLL_FUNCTION(GetTooLongString, XLL_NOT_VOLATILE | XLL_THREAD_SAFE);
 
 // MultiByteStrLen:
 //   Returns the length of a byte string. The purpose of this function

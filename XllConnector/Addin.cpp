@@ -196,7 +196,8 @@ static int RegisterFunction(LPXLOPER12 dllName, const FunctionInfo &f, const Exp
 		return xlretFailed;
 	opers[1] = ordinal;
 
-	opers[2] = std::wstring(f.typeText) + (f.isPure ? L"" : L"!") + (f.isThreadSafe ? L"$" : L"");
+	//opers[2] = std::wstring(f.typeText) + (f.isPure ? L"" : L"!") + (f.isThreadSafe ? L"$" : L"");
+	opers[2] = f.typeText;
 	opers[3] = f.name;
 	// BUG: if the function description is given, then even if the UDF takes
 	//      no arguments, Excel still shows a box to let the user input the

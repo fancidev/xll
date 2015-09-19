@@ -10,6 +10,39 @@
 #define XLL_NAMESPACE xll
 #endif
 
+//
+// Function Attributes
+//
+// Defines attributes of a UDF, which determines how the wrapper is
+// generated and how it is called by Excel.
+//
+// You may override XLL_DEFAULT_VOLATILE and XLL_DEFAULT_THREAD_SAFE
+// at translation unit level BEFORE #include <XllDef.h> to alter the
+// defaults for functions exported from that translation unit.
+//
+// For each individual export, you may set XLL_[NOT_]VOLATILE and/or
+// XLL_[NOT_]THREAD_SAFE to specify the behavior of that UDF.
+//
+
+#define XLL_VOLATILE        1
+#define XLL_NOT_VOLATILE    2
+#define XLL_THREAD_SAFE     4
+#define XLL_NOT_THREAD_SAFE 8
+
+#ifndef XLL_DEFAULT_VOLATILE
+#define XLL_DEFAULT_VOLATILE 1
+#endif
+
+#ifndef XLL_DEFAULT_THREAD_SAFE
+#define XLL_DEFAULT_THREAD_SAFE 0
+#endif
+
+//
+// ALL THE FOLLOWING ARE IMPLEMENTATION DETAILS THAT YOU SHOULDN'T ALTER.
+//
+
+// to be removed
+
 #define XLL_BEGIN_NAMEPSACE namespace XLL_NAMESPACE {
 #define XLL_END_NAMESPACE }
 

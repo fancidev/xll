@@ -101,16 +101,15 @@ namespace XLL_NAMESPACE
 {
 	// TODO: Find some way to have one less template parameter (to make
 	// export table prettier. Might need to use tuples.
-	template <typename Func, Func *func, typename = strip_cc_t<Func> >
+	template <typename Func, Func *func, int Attributes = 0, 
+		      typename = strip_cc_t<Func> >
 	struct XLWrapper;
 
-	template <typename Func, Func *func, typename TRet, typename... TArgs>
-	struct XLWrapper < Func, func, TRet(TArgs...) >
+	template <typename Func, Func *func, int Attributes,
+		      typename TRet, typename... TArgs>
+	struct XLWrapper < Func, func, Attributes, TRet(TArgs...) > 
+		: FunctionAttributes<Attributes>
 	{
-		static_assert(
-			sizeof...(TArgs) <= XLL_MAX_ARG_COUNT,
-			"Your UDF takes too many arguments.");
-
 		static __declspec(dllexport) LPXLOPER12 __stdcall EntryPoint(
 			typename ArgumentMarshaler<TArgs>::WireType... args) XLL_NOEXCEPT
 		{
@@ -137,9 +136,9 @@ namespace XLL_NAMESPACE
 			return const_cast<ExcelVariant*>(&ExcelVariant::ErrValue);
 		}
 
-			static inline FunctionInfo& GetFunctionInfo()
+		static inline FunctionInfo& GetFunctionInfo()
 		{
-			static FunctionInfo& s_info = FunctionInfo::Create(EntryPoint);
+			static FunctionInfo& s_info = FunctionInfo::Create<Attributes>(EntryPoint);
 			return s_info;
 		}
 	};
@@ -158,7 +157,7 @@ namespace XLL_NAMESPACE
 //   *) The macro may be put in any namespace.
 //
 
-#define EXPORT_XLL_FUNCTION(f) \
+#define EXPORT_XLL_FUNCTION(f,...) \
 	static auto XLWrapperInfo_##f = ::XLL_NAMESPACE::FunctionInfoBuilder( \
-		::XLL_NAMESPACE::XLWrapper<decltype(f),f>::GetFunctionInfo()) \
+		::XLL_NAMESPACE::XLWrapper<decltype(f),f,__VA_ARGS__>::GetFunctionInfo()) \
 		.Name(L#f)

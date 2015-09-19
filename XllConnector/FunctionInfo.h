@@ -41,13 +41,13 @@ namespace XLL_NAMESPACE
 		LPCWSTR shortcut;
 		LPCWSTR helpTopic;
 
-		bool isPure;
-		bool isThreadSafe;
+		//bool isPure;
+		//bool isThreadSafe;
 
 		FunctionInfo(FARPROC entryPoint, LPCWSTR typeText)
 			: entryPoint(entryPoint), typeText(typeText),
-			name(), description(), macroType(1), category(), shortcut(), 
-			helpTopic(), isPure(), isThreadSafe()
+			name(), description(), macroType(1), category(), 
+			shortcut(), helpTopic()
 		{
 		}
 
@@ -57,10 +57,10 @@ namespace XLL_NAMESPACE
 			return s_functions;
 		}
 
-		template <typename TRet, typename... TArgs>
+		template <int Attributes, typename TRet, typename... TArgs>
 		static FunctionInfo& Create(TRet(__stdcall *func)(TArgs...))
 		{
-			const wchar_t *typeText = GetTypeTextImpl<wchar_t>(func);
+			const wchar_t *typeText = GetTypeTextImpl<wchar_t, Attributes>(func);
 			registry().emplace_back((FARPROC)func, typeText);
 			return registry().back();
 		}
@@ -105,7 +105,7 @@ namespace XLL_NAMESPACE
 			_info.helpTopic = helpTopic;
 			return (*this);
 		}
-
+/*
 		FunctionInfoBuilder& Pure()
 		{
 			_info.isPure = true;
@@ -122,6 +122,6 @@ namespace XLL_NAMESPACE
 		{
 			_info.isThreadSafe = true;
 			return (*this);
-		}
+		}*/
 	};
 }

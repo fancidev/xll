@@ -37,10 +37,8 @@ namespace
 		.Arg(L"b", L"second number");
 }
 
-EXPORT_XLL_FUNCTION(Minus)
-.Category(L"Test Functions")
-.Pure()
-.ThreadSafe();
+EXPORT_XLL_FUNCTION(Minus, XLL_NOT_VOLATILE | XLL_THREAD_SAFE)
+.Category(L"Test Functions");
 
 EXPORT_XLL_FUNCTION(Square)
 .Description(L"Returns the square of a number.")
