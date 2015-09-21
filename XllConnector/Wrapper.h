@@ -145,7 +145,41 @@ namespace XLL_NAMESPACE
 }
 
 //
-// EXPORT_XLL_FUNCTION
+// XLLocalWrapper
+//
+// Helper class to instantiate an XLWrapper specialization.
+//
+// This class is used by the EXPORT_XLL_FUNCTION() macro to instantiate
+// a specialization of xll::XLWrapper. It employs a few tricks:
+//
+//  i) It is defined as a template with a static member variable so that
+//     the macro doesn't have to make up a static variable name;
+//  2) It is enclosed in an anonymous namespace so that the macro doesn't
+//     have to qualify the namespace; and
+//  3) It normalizes the Attributes template argument passed to XLWrapper
+//     so that there is less code to write in the macro.
+//
+
+namespace
+{
+	template <typename Func, Func *func, int Attributes = 0>
+	struct XLLocalWrapper
+	{
+		static ::XLL_NAMESPACE::FunctionInfoBuilder functionInfoBuilder;
+
+		static inline ::XLL_NAMESPACE::FunctionInfoBuilder 
+			BuildFunctionInfo(LPCWSTR name)
+		{
+			return ::XLL_NAMESPACE::FunctionInfoBuilder(
+				::XLL_NAMESPACE::XLWrapper<Func, func, 
+				::XLL_NAMESPACE::NormalizeAttributes<Attributes>::value>
+				::GetFunctionInfo()).Name(name);
+		}
+	};
+}
+
+//
+// EXPORT_XLL_FUNCTION, EXPORT_XLL_FUNCTION_AS
 //
 // Macro to create and export a wrapper for a given UDF.
 //
@@ -157,8 +191,12 @@ namespace XLL_NAMESPACE
 //   *) The macro may be put in any namespace.
 //
 
+#define EXPORT_XLL_FUNCTION_AS(f, name, ...) \
+	::XLL_NAMESPACE::FunctionInfoBuilder \
+		XLLocalWrapper<decltype(f), f, __VA_ARGS__>::functionInfoBuilder = \
+		XLLocalWrapper<decltype(f), f, __VA_ARGS__>::BuildFunctionInfo(L##name)
+
 #define EXPORT_XLL_FUNCTION(f,...) \
-	static auto XLWrapperInfo_##f = ::XLL_NAMESPACE::FunctionInfoBuilder( \
-		::XLL_NAMESPACE::XLWrapper<decltype(f),f, \
-		::XLL_NAMESPACE::NormalizeAttributes<__VA_ARGS__>::value> \
-		::GetFunctionInfo()).Name(L#f)
+	::XLL_NAMESPACE::FunctionInfoBuilder \
+		XLLocalWrapper<decltype(f), f, __VA_ARGS__>::functionInfoBuilder = \
+		XLLocalWrapper<decltype(f), f, __VA_ARGS__>::BuildFunctionInfo(L#f)

@@ -10,10 +10,15 @@ int __stdcall Minus(int a, int b)
 	return a - b;
 }
 
-double GetCircleArea(double r)
+namespace custom_ns
 {
-	return 3.1415926 * r * r;
+	double GetCircleArea(double r)
+	{
+		return 3.1415926 * r * r;
+	}
 }
+
+EXPORT_XLL_FUNCTION_AS(custom_ns::GetCircleArea, "GetCircleArea");
 
 namespace
 {
