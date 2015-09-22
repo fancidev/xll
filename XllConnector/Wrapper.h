@@ -51,33 +51,12 @@ namespace XLL_NAMESPACE
 	using strip_cc_t = typename strip_cc<Func>::type;
 }
 
+#if XLL_SUPPORT_THREAD_LOCAL
 namespace XLL_NAMESPACE
 {
-	//
-	// getReturnValue
-	//
-	// Returns a pointer an XLOPER12 that holds the return value of a
-	// wrapper function. Because the code that fills the return value
-	// is guaranteed never to be called recursively, we allocate the
-	// return value in thread-local storage (TLS) where supported. 
-	//
-	// TLS is properly supported starting from WIndows Vista. On
-	// earlier platforms, we allocate the return value on the heap.
-	//
-
-	inline LPXLOPER12 getReturnValue()
-	{
-#if XLL_SUPPORT_THREAD_LOCAL
-		__declspec(thread) extern XLOPER12 xllReturnValue;
-		return &xllReturnValue;
-#else
-		LPXLOPER12 p = (LPXLOPER12)malloc(sizeof(XLOPER12));
-		if (p == nullptr)
-			throw std::bad_alloc();
-		return p;
-#endif
-	}
+	__declspec(thread) extern XLOPER12 xllReturnValue;
 }
+#endif
 
 //
 // XLWrapper
@@ -110,12 +89,64 @@ namespace XLL_NAMESPACE
 	struct XLWrapper < Func, func, Attributes, TRet(TArgs...) > 
 		: FunctionAttributes<Attributes>
 	{
+		//
+		// getReturnValue
+		//
+		// Returns a pointer an XLOPER12 that holds the return value of a
+		// wrapper function. Because the code that fills the return value
+		// is guaranteed never to be called recursively, we allocate the
+		// return value in thread-local storage (TLS) where supported. 
+		//
+		// TLS is properly supported starting from WIndows Vista. On
+		// earlier platforms, we allocate the return value on the heap.
+		//
+		// If the UDF is not threadsafe, then Excel will never call it
+		// from more than one thread at any time. In this case, we
+		// allocate the return value statically to save a few instructions.
+		//
+		// Note that we only do this if TLS is supported, because otherwise
+		// there is no way for xlAutoFree to know whether it should free
+		// the LPXLOPER12 pointer.
+		//
+
+#if XLL_SUPPORT_THREAD_LOCAL
+		template <bool Pred> 
+		static inline LPXLOPER12 getReturnValue(
+			std::enable_if_t<Pred, int> = 0)
+		{
+			return &xllReturnValue;
+		}
+
+		template <bool Pred>
+		static inline LPXLOPER12 getReturnValue(
+			std::enable_if_t<!Pred, int> = 0)
+		{
+			static XLOPER12 xllReturnValue;
+			return &xllReturnValue;
+		}
+#else
+		template <bool Pred>
+		static inline LPXLOPER12 getReturnValue()
+		{
+			LPXLOPER12 p = (LPXLOPER12)malloc(sizeof(XLOPER12));
+			if (p == nullptr)
+				throw std::bad_alloc();
+			return p;
+		}
+#endif
+
+		//
+		// EntryPoint
+		//
+		// Actual entry point called by Excel.
+		//
+
 		static __declspec(dllexport) LPXLOPER12 __stdcall EntryPoint(
 			typename ArgumentMarshaler<TArgs>::WireType... args) XLL_NOEXCEPT
 		{
 			try
 			{
-				LPXLOPER12 pvRetVal = getReturnValue();
+				LPXLOPER12 pvRetVal = getReturnValue<IsThreadSafe>();
 				HRESULT hr = SetValue(pvRetVal,
 					func(ArgumentMarshaler<TArgs>::Marshal(args)...));
 				if (FAILED(hr))
@@ -196,7 +227,4 @@ namespace
 		XLLocalWrapper<decltype(f), f, __VA_ARGS__>::functionInfoBuilder = \
 		XLLocalWrapper<decltype(f), f, __VA_ARGS__>::BuildFunctionInfo(L##name)
 
-#define EXPORT_XLL_FUNCTION(f,...) \
-	::XLL_NAMESPACE::FunctionInfoBuilder \
-		XLLocalWrapper<decltype(f), f, __VA_ARGS__>::functionInfoBuilder = \
-		XLLocalWrapper<decltype(f), f, __VA_ARGS__>::BuildFunctionInfo(L#f)
+#define EXPORT_XLL_FUNCTION(f,...) EXPORT_XLL_FUNCTION_AS(f, #f, __VA_ARGS__)

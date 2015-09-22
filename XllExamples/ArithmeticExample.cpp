@@ -28,6 +28,19 @@ namespace
 	}
 }
 
+// This example demonstrates how to check input arguments to
+// avoid throwing a division-by-zero runtime exception, which
+// will crash Excel. A C++ exception, on the other hand, is 
+// handled by XLL Connector and returned to Excel as #VALUE!.
+int DivInt(int a, int b)
+{
+	if (b == 0)
+		throw std::invalid_argument("b cannot be zero");
+	return a / b;
+}
+
+EXPORT_XLL_FUNCTION(DivInt);
+
 double __fastcall Square(double x)
 {
 	return x * x;

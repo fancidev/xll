@@ -327,11 +327,8 @@ void WINAPI xlAutoFree12(LPXLOPER12 p)
 #pragma EXPORT_UNDECORATED_NAME
 	if (p)
 	{
-#if XLL_SUPPORT_THREAD_LOCAL
-		assert(p == &xllReturnValue);
 		XLOPER12_Clear(p);
-#else
-		XLOPER12_Clear(p);
+#if !XLL_SUPPORT_THREAD_LOCAL
 		free(p);
 #endif
 	}
