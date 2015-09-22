@@ -123,6 +123,7 @@ namespace XLL_NAMESPACE
 		typedef Sequence<Char, __VA_ARGS__> SeqType; \
 	}
 
+	DEFINE_TYPE_TEXT(void, '>'); // return value only
 	DEFINE_TYPE_TEXT(bool, 'A');
 	DEFINE_TYPE_TEXT(bool*, 'L');
 	DEFINE_TYPE_TEXT(double, 'B');

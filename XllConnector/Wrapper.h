@@ -141,8 +141,9 @@ namespace XLL_NAMESPACE
 		// Actual entry point called by Excel.
 		//
 
-		static __declspec(dllexport) LPXLOPER12 __stdcall EntryPoint(
-			typename ArgumentMarshaler<TArgs>::WireType... args) XLL_NOEXCEPT
+		static __declspec(dllexport) LPXLOPER12 __stdcall 
+		EntryPoint(typename ArgumentMarshaler<TArgs>::WireType... args) 
+		XLL_NOEXCEPT
 		{
 			try
 			{
@@ -165,6 +166,41 @@ namespace XLL_NAMESPACE
 				// todo: report exception
 			}
 			return const_cast<ExcelVariant*>(&ExcelVariant::ErrValue);
+		}
+
+		static inline FunctionInfo& GetFunctionInfo()
+		{
+			static FunctionInfo& s_info = FunctionInfo::Create<Attributes>(EntryPoint);
+			return s_info;
+		}
+	};
+
+	template <typename Func, Func *func, int Attributes, typename... TArgs>
+	struct XLWrapper < Func, func, Attributes, void(TArgs...) >
+		: FunctionAttributes<Attributes>
+	{
+		//
+		// EntryPoint
+		//
+		// Actual entry point called by Excel.
+		//
+
+		static __declspec(dllexport) void __stdcall
+		EntryPoint(typename ArgumentMarshaler<TArgs>::WireType... args)
+		XLL_NOEXCEPT
+		{
+			try
+			{
+				func(ArgumentMarshaler<TArgs>::Marshal(args)...);
+			}
+			catch (const std::exception &)
+			{
+				// todo: report exception
+			}
+			catch (...)
+			{
+				// todo: report exception
+			}
 		}
 
 		static inline FunctionInfo& GetFunctionInfo()

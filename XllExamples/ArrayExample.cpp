@@ -145,7 +145,7 @@ EXPORT_XLL_FUNCTION(PartialSum);
 //
 // This example also shows that the FP12* array is passed in row-major.
 
-int ShuffleColumns(FP12 *mat)
+void ShuffleColumns(FP12 *mat)
 {
 	if (mat && mat->rows>0 && mat->columns > 0)
 	{
@@ -166,7 +166,6 @@ int ShuffleColumns(FP12 *mat)
 			}
 		}
 	}
-	return 1;
 }
 
 EXPORT_XLL_FUNCTION(ShuffleColumns, XLL_THREADSAFE);
