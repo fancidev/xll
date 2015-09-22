@@ -136,6 +136,7 @@ namespace XLL_NAMESPACE
 	DEFINE_TYPE_TEXT(int16_t*, 'M');
 	DEFINE_TYPE_TEXT(int32_t, 'J');
 	DEFINE_TYPE_TEXT(int32_t*, 'N');
+	DEFINE_TYPE_TEXT(FP12*, 'K', '%');
 	DEFINE_TYPE_TEXT(LPXLOPER12, 'Q');
 
 	template <typename Char, int Attributes>

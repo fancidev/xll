@@ -32,6 +32,8 @@
 #include <cassert>
 #include <comdef.h>
 #include <comutil.h>
+#include <algorithm>
+#include <random>
 
 // Helper class to access a two-dimensional SAFEARRAY with element type
 // VARIANT. The wrapper always creates such an array when the UDF expects
@@ -135,3 +137,36 @@ double PartialSum(SAFEARRAY *matrix, int count)
 }
 
 EXPORT_XLL_FUNCTION(PartialSum);
+
+// ShuffleColumns -- reorder the columns in a matrix randomly.
+// 
+// This example shows how to use FP12* type argument, and how to return
+// value in-place. To do this, define the function as void.
+//
+// This example also shows that the FP12* array is passed in row-major.
+
+int ShuffleColumns(FP12 *mat)
+{
+	if (mat && mat->rows>0 && mat->columns > 0)
+	{
+		std::vector<int> order(mat->columns);
+		for (int j = 0; j < mat->columns; j++)
+			order[j] = j;
+
+		std::default_random_engine rng;
+		std::shuffle(std::begin(order), std::end(order), rng);
+
+		for (int i = 0; i < mat->rows; i++)
+		{
+			for (int j = 0; j < mat->columns; j++)
+			{
+				std::swap(
+					mat->array[i*mat->columns + j],
+					mat->array[i*mat->columns + order[j]]);
+			}
+		}
+	}
+	return 1;
+}
+
+EXPORT_XLL_FUNCTION(ShuffleColumns, XLL_THREADSAFE);

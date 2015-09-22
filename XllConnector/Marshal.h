@@ -101,6 +101,7 @@ struct ArgumentMarshalerImpl
 
 IMPLEMENT_ARGUMENT_MARSHALER(double);
 IMPLEMENT_ARGUMENT_MARSHALER(int);
+IMPLEMENT_ARGUMENT_MARSHALER(FP12*);
 
 //
 // String marshalling
