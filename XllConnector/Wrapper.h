@@ -149,7 +149,7 @@ namespace XLL_NAMESPACE
 			{
 				LPXLOPER12 pvRetVal = getReturnValue<IsThreadSafe>();
 				HRESULT hr = SetValue(pvRetVal,
-					func(ArgumentMarshaler<TArgs>::Marshal(args)...));
+					func(ArgumentMarshaler<TArgs>::MarshalIn(args)...));
 				if (FAILED(hr))
 				{
 					throw std::invalid_argument(
@@ -175,8 +175,18 @@ namespace XLL_NAMESPACE
 		}
 	};
 
-	template <typename Func, Func *func, int Attributes, typename... TArgs>
-	struct XLWrapper < Func, func, Attributes, void(TArgs...) >
+	template <typename Func, Func *func, int Attributes>
+	struct XLWrapper < Func, func, Attributes, void() >
+		: FunctionAttributes<Attributes>
+	{
+		template <typename T> struct always_false : std::false_type {};
+		static_assert(always_false<Func>::value,
+			"A void-returning function must take its at least "
+			"one modified-in-place argument.");
+	};
+
+	template <typename Func, Func *func, int Attributes, typename TArg1, typename... TArgs>
+	struct XLWrapper < Func, func, Attributes, void(TArg1, TArgs...) >
 		: FunctionAttributes<Attributes>
 	{
 		//
@@ -186,12 +196,14 @@ namespace XLL_NAMESPACE
 		//
 
 		static __declspec(dllexport) void __stdcall
-		EntryPoint(typename ArgumentMarshaler<TArgs>::WireType... args)
+		EntryPoint(typename ArgumentMarshaler<TArg1>::WireType arg1,
+				   typename ArgumentMarshaler<TArgs>::WireType... args)
 		XLL_NOEXCEPT
 		{
 			try
 			{
-				func(ArgumentMarshaler<TArgs>::Marshal(args)...);
+				func(ArgumentMarshaler<TArg1>::MarshalInOut(arg1),
+					 ArgumentMarshaler<TArgs>::MarshalIn(args)...);
 			}
 			catch (const std::exception &)
 			{
