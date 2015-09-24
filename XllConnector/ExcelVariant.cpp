@@ -31,33 +31,3 @@ const ExcelVariant ExcelVariant::ErrValue(ExcelVariant::MakeError(xlerrValue));
 //};
 
 
-void XLOPER12_Clear(XLOPER12 *p)
-{
-	if (p == nullptr)
-		return;
-
-	switch (p->xltype & ~xlbitDLLFree)
-	{
-	case xltypeStr:
-		free(p->val.str);
-		break;
-	case xltypeRef:
-		free(p->val.mref.lpmref);
-		break;
-	case xltypeMulti:
-		if (p->val.array.lparray != nullptr)
-		{
-			int nr = p->val.array.rows;
-			int nc = p->val.array.columns;
-			int count = nr*nc;
-			if (nr > 0 && nc > 0 && count > 0)
-			{
-				for (int i = 0; i < count; i++)
-					XLOPER12_Clear(&p->val.array.lparray[i]);
-			}
-			free(p->val.array.lparray);
-		}
-		break;
-	}
-	p->xltype = 0;
-}

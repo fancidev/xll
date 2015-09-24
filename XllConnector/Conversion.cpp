@@ -11,7 +11,38 @@ namespace XLL_NAMESPACE
 	// Conversions to XLOPER12
 	//
 
-	HRESULT SetValue(LPXLOPER12 dest, const XLOPER12 &from)
+	HRESULT DeleteValue(LPXLOPER12 p)
+	{
+		assert(p != nullptr);
+
+		switch (p->xltype & ~(xlbitDLLFree | xlbitXLFree))
+		{
+		case xltypeStr:
+			free(p->val.str);
+			break;
+		case xltypeRef:
+			free(p->val.mref.lpmref);
+			break;
+		case xltypeMulti:
+			if (p->val.array.lparray != nullptr)
+			{
+				int nr = p->val.array.rows;
+				int nc = p->val.array.columns;
+				int count = nr*nc;
+				if (nr > 0 && nc > 0 && count > 0)
+				{
+					for (int i = 0; i < count; i++)
+						DeleteValue(&p->val.array.lparray[i]);
+				}
+				free(p->val.array.lparray);
+			}
+			break;
+		}
+		p->xltype = 0;
+		return S_OK;
+	}
+
+	HRESULT CreateValue(LPXLOPER12 dest, const XLOPER12 &from)
 	{
 		assert(dest != nullptr);
 
@@ -61,7 +92,7 @@ namespace XLL_NAMESPACE
 
 				for (int i = 0; i < count; i++)
 				{
-					HRESULT hr = SetValue(&p[i], from.val.array.lparray[i]);
+					HRESULT hr = CreateValue(&p[i], from.val.array.lparray[i]);
 					if (FAILED(hr))
 					{
 						free(p);
@@ -90,7 +121,7 @@ namespace XLL_NAMESPACE
 		return S_OK;
 	}
 
-	HRESULT SetValue(LPXLOPER12 dest, double value)
+	HRESULT CreateValue(LPXLOPER12 dest, double value)
 	{
 		assert(dest != nullptr);
 		dest->xltype = xltypeNum;
@@ -98,7 +129,7 @@ namespace XLL_NAMESPACE
 		return S_OK;
 	}
 
-	HRESULT SetValue(LPXLOPER12 dest, int value)
+	HRESULT CreateValue(LPXLOPER12 dest, int value)
 	{
 		assert(dest != nullptr);
 		dest->xltype = xltypeInt;
@@ -106,12 +137,12 @@ namespace XLL_NAMESPACE
 		return S_OK;
 	}
 
-	HRESULT SetValue(LPXLOPER12 dest, unsigned long value)
+	HRESULT CreateValue(LPXLOPER12 dest, unsigned long value)
 	{
-		return SetValue(dest, static_cast<double>(value));
+		return CreateValue(dest, static_cast<double>(value));
 	}
 
-	HRESULT SetValue(LPXLOPER12 dest, bool value)
+	HRESULT CreateValue(LPXLOPER12 dest, bool value)
 	{
 		assert(dest != nullptr);
 		dest->xltype = xltypeBool;
@@ -119,7 +150,7 @@ namespace XLL_NAMESPACE
 		return S_OK;
 	}
 
-	HRESULT SetValue(LPXLOPER12 dest, const wchar_t *s, size_t len)
+	HRESULT CreateValue(LPXLOPER12 dest, const wchar_t *s, size_t len)
 	{
 		assert(dest != nullptr);
 		if (s == nullptr)
@@ -143,22 +174,27 @@ namespace XLL_NAMESPACE
 		return S_OK;
 	}
 
-	HRESULT SetValue(LPXLOPER12 dest, const wchar_t *s)
+	HRESULT CreateValue(LPXLOPER12 dest, const wchar_t *s)
 	{
-		return SetValue(dest, s, (s == nullptr) ? 0 : lstrlenW(s));
+		return CreateValue(dest, s, (s == nullptr) ? 0 : lstrlenW(s));
 	}
 
-	HRESULT SetValue(LPXLOPER12 dest, const std::wstring &s)
+	HRESULT CreateValue(LPXLOPER12 dest, const std::wstring &s)
 	{
-		return SetValue(dest, s.c_str(), s.size());
+		return CreateValue(dest, s.c_str(), s.size());
 	}
 
 	//
 	// Conversions to VARIANT
 	//
 
-	HRESULT SetValue(VARIANT *dest, const XLOPER12 &src)
-	//template <> VARIANT make<VARIANT>(const XLOPER12 &src)
+	HRESULT DeleteValue(VARIANT *p)
+	{
+		assert(p != nullptr);
+		return VariantClear(p);
+	}
+
+	HRESULT CreateValue(VARIANT *dest, const XLOPER12 &src)
 	{
 		assert(dest != nullptr);
 		VariantInit(dest);
@@ -200,7 +236,7 @@ namespace XLL_NAMESPACE
 			V_I4(dest) = src.val.w;
 			break;
 		case xltypeMulti:
-			hr = SetValue(&V_ARRAY(dest), src);
+			hr = CreateValue(&V_ARRAY(dest), src);
 			if (FAILED(hr))
 				return hr;
 			V_VT(dest) = VT_ARRAY | VT_VARIANT;
@@ -220,8 +256,20 @@ namespace XLL_NAMESPACE
 	// Conversions to LPSAFEARRAY
 	//
 
-	//template <> LPSAFEARRAY make<LPSAFEARRAY>(const XLOPER12 &src)
-	HRESULT SetValue(SAFEARRAY**ppsa, const XLOPER12 &src)
+	HRESULT DeleteValue(SAFEARRAY** ppsa)
+	{
+		assert(ppsa != nullptr);
+		HRESULT hr = S_OK;
+		if (*ppsa)
+		{
+			hr = SafeArrayDestroy(*ppsa);
+			if (SUCCEEDED(hr))
+				*ppsa = nullptr;
+		}
+		return hr;
+	}
+
+	HRESULT CreateValue(SAFEARRAY **ppsa, const XLOPER12 &src)
 	{
 		assert(ppsa != nullptr);
 		*ppsa = nullptr;
@@ -276,12 +324,12 @@ namespace XLL_NAMESPACE
 			int count = nr*nc;
 			for (int i = 0; i < count; i++)
 			{
-				hr = SetValue(&dest[i], pSrc[i]);
+				hr = CreateValue(&dest[i], pSrc[i]);
 				if (FAILED(hr))
 				{
 					for (int j = 0; j < i; j++)
 					{
-						VariantClear(&dest[j]);
+						DeleteValue(&dest[j]);
 					}
 					break;
 				}

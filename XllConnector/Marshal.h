@@ -233,13 +233,13 @@ namespace XLL_NAMESPACE
 		}
 		VariantAdapter(LPXLOPER12 pv)
 		{
-			HRESULT hr = SetValue(&m_value, *pv);
+			HRESULT hr = CreateValue(&m_value, *pv);
 			if (FAILED(hr))
 				throw std::invalid_argument("Cannot convert XLOPER12 to VARIANT");
 		}
 		~VariantAdapter()
 		{
-			VariantClear(&m_value);
+			DeleteValue(&m_value);
 		}
 		operator VARIANT*() { return &m_value; }
 	};
@@ -267,17 +267,13 @@ namespace XLL_NAMESPACE
 		}
 		SafeArrayAdapter(LPXLOPER12 pv)
 		{
-			HRESULT hr = SetValue(&psa, *pv);
+			HRESULT hr = CreateValue(&psa, *pv);
 			if (FAILED(hr))
 				throw std::invalid_argument("Cannot convert XLOPER12 to SAFEARRAY.");
 		}
 		~SafeArrayAdapter()
 		{
-			if (psa)
-			{
-				SafeArrayDestroy(psa);
-				psa = nullptr;
-			}
+			DeleteValue(&psa);
 		}
 		operator SAFEARRAY*() { return psa; }
 	};

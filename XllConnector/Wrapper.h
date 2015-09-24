@@ -140,7 +140,7 @@ namespace XLL_NAMESPACE
 			try
 			{
 				LPXLOPER12 pvRetVal = AllocateReturnValue(IsThreadSafe);
-				HRESULT hr = SetValue(pvRetVal,
+				HRESULT hr = CreateValue(pvRetVal,
 					func(ArgumentMarshaler<TArgs>::MarshalIn(args)...));
 				if (FAILED(hr))
 				{

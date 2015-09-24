@@ -7,71 +7,63 @@
 #include <string>
 
 //
-// SetValue(Destination, Source)
+// CreateValue(Destination, Source)
 //
-// Sets the value at Destination to Source by making a deep copy.
+// Creates a value at Destination by making a deep copy of Source.
 //
-// XLL Connector uses (the overloads of) this function to perform all
-// conversions between data types. A deep copy is always made; hence
-// Source can be released after the call.
-// 
-// 
+// This function behaves like a constructor. The memory at Destination
+// is assumed to be uninitialized before the call. If the function
+// succeeds, the memory must have been properly initialized. If the
+// function fails, the memory remains uninitialized.
 //
-// This template function is used as the universal conversion mechanism
-// in this library. It makes it possible to convert between values
-// without the need of dedicated constructors or type cast operators.
-// 
-// For example, to convert a double to VARIANT, use
+// This function always makes a deep copy. For example, the following
+// line creates a VARIANT from a double, and then makes a deep copy
+// of it:
 //
-//   VARIANT dest = make<VARIANT>(1.0);
+//   VARIANT u, v;
+//   CreateValue(&u, 1.0);
+//   CreateValue(&v, u);
 //
-// To convert a VARIANT to a double, use
+// If the function succeeds, it returns S_OK. If it fails, it returns
+// an HRESULT error code. Always check the return value to make sure
+// the value is actually created.
 //
-//   double x = make<double>(dest);
+// To destroy a created value, call DeleteValue().
 //
-// Note that the function always creates a new object. For example, the
-// following code creates a deep copy of an existing VARIANT:
-//
-//   VARIANT copy = make<VARIANT>(dest);
-//
-// If conversion fails because of the values are not compatible, an
-// implementation should throw a BadConversion exception. If conversion
-// fails for other reasons such as memory allocation failure, the
-// implementation should throw the corresponding appropriate exception.
-//
-// This library provides several routines to convert between the common
-// data types used in marshalling.
+// XLL Connector uses (an overload of) this function to perform all
+// data type conversions; in particular, it marshals the return value
+// of a UDF to XLOPER12 using one of the overloads of CreateValue().
+// Therefore, you must overload this function to support marshalling
+// your custom type as return value.
 //
 
 namespace XLL_NAMESPACE
 {
-	// TODO: should be called CreateValue because we assume
-	// the dest to be uninitialized.
-
 	//
 	// Conversions to XLOPER12.
 	//
 
-	HRESULT SetValue(LPXLOPER12, const XLOPER12 &);
-	HRESULT SetValue(LPXLOPER12, double);
-	HRESULT SetValue(LPXLOPER12, int);
-	HRESULT SetValue(LPXLOPER12, unsigned long);
-	HRESULT SetValue(LPXLOPER12, bool);
-	HRESULT SetValue(LPXLOPER12, const wchar_t *, size_t);
-	HRESULT SetValue(LPXLOPER12, const wchar_t *);
-	HRESULT SetValue(LPXLOPER12, const std::wstring &);
+	HRESULT CreateValue(LPXLOPER12, const XLOPER12 &);
+	HRESULT CreateValue(LPXLOPER12, double);
+	HRESULT CreateValue(LPXLOPER12, int);
+	HRESULT CreateValue(LPXLOPER12, unsigned long);
+	HRESULT CreateValue(LPXLOPER12, bool);
+	HRESULT CreateValue(LPXLOPER12, const wchar_t *, size_t);
+	HRESULT CreateValue(LPXLOPER12, const wchar_t *);
+	HRESULT CreateValue(LPXLOPER12, const std::wstring &);
+	HRESULT DeleteValue(LPXLOPER12);
 
 	//
 	// Conversions to VARIANT.
 	//
 
-	HRESULT SetValue(VARIANT*, const XLOPER12 &);
-	//void ClearValue(VARIANT*);
+	HRESULT CreateValue(VARIANT*, const XLOPER12 &);
+	HRESULT DeleteValue(VARIANT*);
 
 	//
 	// Conversions to LPSAFEARRAY.
 	//
 
-	HRESULT SetValue(SAFEARRAY**, const XLOPER12 &);
-	//void ClearValue(SAFEARRAY*);
+	HRESULT CreateValue(SAFEARRAY**, const XLOPER12 &);
+	HRESULT DeleteValue(SAFEARRAY**);
 }
