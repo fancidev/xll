@@ -184,6 +184,32 @@ namespace XLL_NAMESPACE
 		return CreateValue(dest, s.c_str(), s.size());
 	}
 
+	// Conversions from XLOPER12
+
+	HRESULT CreateValue(double* pv, const XLOPER12 &x)
+	{
+		assert(pv != nullptr);
+		if (x.xltype == xltypeNum)
+		{
+			*pv = x.val.num;
+			return S_OK;
+		}
+		else
+		{
+			XLOPER12 type;
+			type.xltype = xltypeInt;
+			type.val.w = xltypeNum;
+
+			XLOPER12 result;
+			if (Excel12(xlCoerce, &result, 2, &x, &type) == xlretSuccess)
+			{
+				*pv = result.val.num;
+				return S_OK;
+			}
+			return E_FAIL;
+		}
+	}
+
 	//
 	// Conversions to VARIANT
 	//

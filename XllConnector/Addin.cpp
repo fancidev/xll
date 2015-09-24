@@ -171,7 +171,7 @@ public:
 	}
 };
 
-static int RegisterFunction(LPXLOPER12 dllName, const FunctionInfo &f, const ExportTableHelper &exports)
+static double RegisterFunction(LPXLOPER12 dllName, const FunctionInfo &f, const ExportTableHelper &exports)
 {
 	// This is enforced by a static_assert in XLWrapper.
 	assert(f.arguments.size() <= XLL_MAX_ARG_COUNT);
@@ -240,8 +240,13 @@ static int RegisterFunction(LPXLOPER12 dllName, const FunctionInfo &f, const Exp
 		n = 10 + static_cast<int>(f.arguments.size());
 
 	XLOPER12 id;
-	int ret = Excel12v(xlfRegister, &id, n, popers);
-	return ret;
+	if (Excel12v(xlfRegister, &id, n, popers) == xlretSuccess)
+	{
+		if (id.xltype == xltypeNum)
+			return id.val.num;
+		Excel12(xlFree, 0, 1, &id);
+	}
+	return 0.0;
 }
 
 #if 0
@@ -288,7 +293,17 @@ int WINAPI xlAutoOpen()
 	{
 		for (FunctionInfo &f : XLL_NAMESPACE::FunctionInfo::registry())
 		{
-			RegisterFunction(&xDLL, f, exports);
+			try 
+			{
+				double id = RegisterFunction(&xDLL, f, exports);
+				if (id != 0)
+				{
+					f.registerId = id;
+				}
+			}
+			catch (...)
+			{
+			}
 		}
 		// RegisterFunctionTest(&xDLL);
 		Excel12(xlFree, 0, 1, &xDLL);
@@ -300,27 +315,88 @@ int WINAPI xlAutoClose()
 {
 #pragma EXPORT_UNDECORATED_NAME
 
+	// Type the following in VBA Immediate Window to unload the DLL:
+	// Application.ExecuteExcel4Macro "UNREGISTER(""E:\Dev\Repos\Xll\Debug\XllExamples.dll"")"
+	//
+	// The XLL should unregister functions and delete names when being
+	// unloaded. However, there is no point doing this because
+	//
+	//   1) https://msdn.microsoft.com/en-us/library/office/bb687830.aspx
+	//      Excel automatically unregisters the functions after calling
+	//      xlAutoClose().
+	//
+	//   2) https://msdn.microsoft.com/en-us/library/office/bb687841.aspx
+	//      A known bug prevents the name from being deleted.
+	// 
+	// Therefore we do nothing here.
+#if 0
+	for (FunctionInfo &f : XLL_NAMESPACE::FunctionInfo::registry())
+	{
+		if (f.registerId != 0)
+		{
+			Excel12(xlfUnregister, 0, 1, &ExcelVariant(f.registerId));
+			Excel12(xlfSetName, 0, 1, &ExcelVariant(f.name));
+		}
+	}
+#endif
 	return 1;
 }
 
+// Not implemented.
 LPXLOPER12 WINAPI xlAutoRegister12(LPXLOPER12 pxName)
 {
 	return 0;
 }
 
+// Not implemented.
 int WINAPI xlAutoAdd(void)
 {
 	return 1;
 }
 
+// Not implemented.
 int WINAPI xlAutoRemove(void)
 {
 	return 1;
 }
 
+namespace XLL_NAMESPACE
+{
+	LPCWSTR AddInName(LPCWSTR name)
+	{
+		static LPCWSTR s_name = nullptr;
+		if (name != nullptr)
+		{
+			s_name = name;
+		}
+		return s_name;
+	}
+}
+
+// To remove an add-in entry from Excel's Add-Ins dialog box, make 
+// sure Excel is not running, and then open regedit and delete the
+// corresponding registry entry in the following location:
+//
+// \HKEY_CURRENT_USER\Software\Microsoft\Office\15.0\Excel\Add-in Manager
+//
+// For more information, see https://support.microsoft.com/en-us/kb/161439
+
 LPXLOPER12 WINAPI xlAddInManagerInfo12(LPXLOPER12 xAction)
 {
-	return 0;
+#pragma EXPORT_UNDECORATED_NAME
+	if (xAction && AddInName(NULL))
+	{
+		double action;
+		if (SUCCEEDED(CreateValue(&action, *xAction)) && action == 1.0)
+		{
+			// Addin functions are guaranteed to be called from the 
+			// main thread, so we can use the global return value.
+			LPXLOPER12 xResult = &globalReturnValue;
+			if (SUCCEEDED(CreateValue(xResult, AddInName(NULL))))
+				return xResult;
+		}
+	}
+	return NULL;
 }
 
 void WINAPI xlAutoFree12(LPXLOPER12 p)

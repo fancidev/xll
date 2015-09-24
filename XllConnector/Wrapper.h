@@ -51,6 +51,33 @@ namespace XLL_NAMESPACE
 	using strip_cc_t = typename strip_cc<Func>::type;
 }
 
+// TODO: the following two functions should be moved to a separate
+// header file, probably merge with Invoke.
+
+//
+// AddInName(name)
+//
+// Gets or sets the name of this XLL add-in.
+//
+// If name is NULL, returns the add-in name. If name is not NULL,
+// sets the add-in name and returns name. name must be a string
+// constant. 
+// 
+// To set the add-in name, this function must be called at static
+// initialization time, because Excel queries the add-in name as
+// soon as it loads the DLL. 
+//
+// Use the XLL_ADDIN_NAME() macro to set add-in name.
+//
+
+namespace XLL_NAMESPACE
+{
+	LPCWSTR AddInName(LPCWSTR name = NULL);
+}
+
+#define XLL_ADDIN_NAME(name) \
+	static LPCWSTR _XllConnector_AddInName = ::XLL_NAMESPACE::AddInName(name)
+
 //
 // AllocateReturnValue
 //

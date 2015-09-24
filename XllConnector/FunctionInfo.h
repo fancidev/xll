@@ -41,13 +41,15 @@ namespace XLL_NAMESPACE
 		LPCWSTR shortcut;
 		LPCWSTR helpTopic;
 
+		double registerId;
+
 		//bool isPure;
 		//bool isThreadSafe;
 
 		FunctionInfo(FARPROC entryPoint, LPCWSTR typeText)
 			: entryPoint(entryPoint), typeText(typeText),
 			name(), description(), macroType(1), category(), 
-			shortcut(), helpTopic()
+			shortcut(), helpTopic(), registerId()
 		{
 		}
 

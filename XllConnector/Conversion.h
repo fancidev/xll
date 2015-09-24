@@ -53,6 +53,9 @@ namespace XLL_NAMESPACE
 	HRESULT CreateValue(LPXLOPER12, const std::wstring &);
 	HRESULT DeleteValue(LPXLOPER12);
 
+	// Conversions from XLOPER12.
+	HRESULT CreateValue(double*, const XLOPER12 &);
+
 	//
 	// Conversions to VARIANT.
 	//
