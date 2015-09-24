@@ -51,12 +51,50 @@ namespace XLL_NAMESPACE
 	using strip_cc_t = typename strip_cc<Func>::type;
 }
 
-#if XLL_SUPPORT_THREAD_LOCAL
+//
+// AllocateReturnValue
+//
+// Returns a pointer an XLOPER12 used to hold the return value of a
+// wrapper function.
+//
+// When wrapping a thread-unsafe UDF, we return a pointer to a global
+// variable. This is safe because Excel always calls thread-unsafe
+// UDFs from the main thread, and XLL Connector does not call any
+// wrapper code (directly or indirectly) after filling the return
+// value and before returning it to Excel.
+//
+// When wrapping a thread-safe UDF, we return a pointer to a thread-
+// local variable if supported, or allocate on the heap otherwise.
+// TLS is properly supported starting from Windows Vista. For more
+// info on TLS support, see http://www.nynaeve.net/?p=190.
+//
+// The global/thread-local variables are defined in Addin.cpp. They
+// are freed in xlAutoFree12().
+// 
+
 namespace XLL_NAMESPACE
 {
-	__declspec(thread) extern XLOPER12 xllReturnValue;
-}
+	inline LPXLOPER12 AllocateReturnValue(bool isThreadSafe)
+	{
+		if (isThreadSafe)
+		{
+#if XLL_SUPPORT_THREAD_LOCAL
+			__declspec(thread) extern XLOPER12 threadReturnValue;
+			return &threadReturnValue;
+#else
+			LPXLOPER12 p = (LPXLOPER12)malloc(sizeof(XLOPER12));
+			if (p == nullptr)
+				throw std::bad_alloc();
+			return p;
 #endif
+		}
+		else
+		{
+			extern XLOPER12 globalReturnValue;
+			return &globalReturnValue;
+		}
+	}
+}
 
 //
 // XLWrapper
@@ -90,52 +128,6 @@ namespace XLL_NAMESPACE
 		: FunctionAttributes<Attributes>
 	{
 		//
-		// getReturnValue
-		//
-		// Returns a pointer an XLOPER12 that holds the return value of a
-		// wrapper function. Because the code that fills the return value
-		// is guaranteed never to be called recursively, we allocate the
-		// return value in thread-local storage (TLS) where supported. 
-		//
-		// TLS is properly supported starting from WIndows Vista. On
-		// earlier platforms, we allocate the return value on the heap.
-		//
-		// If the UDF is not threadsafe, then Excel will never call it
-		// from more than one thread at any time. In this case, we
-		// allocate the return value statically to save a few instructions.
-		//
-		// Note that we only do this if TLS is supported, because otherwise
-		// there is no way for xlAutoFree to know whether it should free
-		// the LPXLOPER12 pointer.
-		//
-
-#if XLL_SUPPORT_THREAD_LOCAL
-		template <bool Pred> 
-		static inline LPXLOPER12 getReturnValue(
-			std::enable_if_t<Pred, int> = 0)
-		{
-			return &xllReturnValue;
-		}
-
-		template <bool Pred>
-		static inline LPXLOPER12 getReturnValue(
-			std::enable_if_t<!Pred, int> = 0)
-		{
-			static XLOPER12 xllReturnValue;
-			return &xllReturnValue;
-		}
-#else
-		template <bool Pred>
-		static inline LPXLOPER12 getReturnValue()
-		{
-			LPXLOPER12 p = (LPXLOPER12)malloc(sizeof(XLOPER12));
-			if (p == nullptr)
-				throw std::bad_alloc();
-			return p;
-		}
-#endif
-
-		//
 		// EntryPoint
 		//
 		// Actual entry point called by Excel.
@@ -147,7 +139,7 @@ namespace XLL_NAMESPACE
 		{
 			try
 			{
-				LPXLOPER12 pvRetVal = getReturnValue<IsThreadSafe>();
+				LPXLOPER12 pvRetVal = AllocateReturnValue(IsThreadSafe);
 				HRESULT hr = SetValue(pvRetVal,
 					func(ArgumentMarshaler<TArgs>::MarshalIn(args)...));
 				if (FAILED(hr))

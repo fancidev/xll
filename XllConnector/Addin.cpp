@@ -12,8 +12,9 @@
 namespace XLL_NAMESPACE
 {
 #if XLL_SUPPORT_THREAD_LOCAL
-	__declspec(thread) XLOPER12 xllReturnValue;
+	__declspec(thread) XLOPER12 threadReturnValue;
 #endif
+	XLOPER12 globalReturnValue;
 }
 
 using namespace XLL_NAMESPACE;
@@ -328,8 +329,15 @@ void WINAPI xlAutoFree12(LPXLOPER12 p)
 	if (p)
 	{
 		XLOPER12_Clear(p);
-#if !XLL_SUPPORT_THREAD_LOCAL
-		free(p);
+#if XLL_SUPPORT_THREAD_LOCAL
+		assert(p == &::XLL_NAMESPACE::globalReturnValue ||
+			   p == &::XLL_NAMESPACE::threadReturnValue);
+#else
+		if (p != &::XLL_NAMESPACE::globalReturnValue &&
+			p != &::XLL_NAMESPACE::threadReturnValue)
+		{
+			free(p);
+		}
 #endif
 	}
 }
