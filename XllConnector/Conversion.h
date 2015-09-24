@@ -6,10 +6,16 @@
 #include "xlldef.h"
 #include <string>
 
-XLL_BEGIN_NAMEPSACE
-
 //
-// make -- creates a value of type T from the value of 'src'
+// SetValue(Destination, Source)
+//
+// Sets the value at Destination to Source by making a deep copy.
+//
+// XLL Connector uses (the overloads of) this function to perform all
+// conversions between data types. A deep copy is always made; hence
+// Source can be released after the call.
+// 
+// 
 //
 // This template function is used as the universal conversion mechanism
 // in this library. It makes it possible to convert between values
@@ -37,55 +43,35 @@ XLL_BEGIN_NAMEPSACE
 // data types used in marshalling.
 //
 
-#define XLL_ALLOW_MAKE_FROM(TFrom) \
-	template <typename T> T make(TFrom) { \
-		static_assert(false, "Don't know how to make the requested conversion."); \
-	}
+namespace XLL_NAMESPACE
+{
+	// TODO: should be called CreateValue because we assume
+	// the dest to be uninitialized.
 
-XLL_ALLOW_MAKE_FROM(bool);
-XLL_ALLOW_MAKE_FROM(int);
-XLL_ALLOW_MAKE_FROM(unsigned int);
-XLL_ALLOW_MAKE_FROM(unsigned long);
-XLL_ALLOW_MAKE_FROM(double);
-XLL_ALLOW_MAKE_FROM(const wchar_t *);
-XLL_ALLOW_MAKE_FROM(const std::wstring &);
-XLL_ALLOW_MAKE_FROM(const XLOPER12 &);
+	//
+	// Conversions to XLOPER12.
+	//
 
-// enum class 
-//In these implementations, if the
-// source data is too large to fit into the destination type, it checks
-// the return value of GetTruncationPolicy() to determine the action.
-//void SetTruncationPolicy();
-//int GetTruncationPolicy();
+	HRESULT SetValue(LPXLOPER12, const XLOPER12 &);
+	HRESULT SetValue(LPXLOPER12, double);
+	HRESULT SetValue(LPXLOPER12, int);
+	HRESULT SetValue(LPXLOPER12, unsigned long);
+	HRESULT SetValue(LPXLOPER12, bool);
+	HRESULT SetValue(LPXLOPER12, const wchar_t *, size_t);
+	HRESULT SetValue(LPXLOPER12, const wchar_t *);
+	HRESULT SetValue(LPXLOPER12, const std::wstring &);
 
-//
-// Conversions to XLOPER12.
-//
+	//
+	// Conversions to VARIANT.
+	//
 
-HRESULT SetValue(LPXLOPER12, const XLOPER12 &);
-HRESULT SetValue(LPXLOPER12, double);
-HRESULT SetValue(LPXLOPER12, int);
-HRESULT SetValue(LPXLOPER12, unsigned long);
-HRESULT SetValue(LPXLOPER12, bool);
-HRESULT SetValue(LPXLOPER12, const wchar_t *, size_t);
-HRESULT SetValue(LPXLOPER12, const wchar_t *);
-HRESULT SetValue(LPXLOPER12, const std::wstring &);
+	HRESULT SetValue(VARIANT*, const XLOPER12 &);
+	//void ClearValue(VARIANT*);
 
-//inline void XLOPER12_Create(LPXLOPER12 pv, unsigned long value)
-//{
-//	XLOPER12_Create(pv, static_cast<double>(value));
-//}
+	//
+	// Conversions to LPSAFEARRAY.
+	//
 
-//
-// Conversions to VARIANT.
-//
-
-template <> VARIANT make<VARIANT>(const XLOPER12 &);
-
-//
-// Conversions to LPSAFEARRAY.
-//
-
-template <> LPSAFEARRAY make<LPSAFEARRAY>(const XLOPER12 &);
-
-XLL_END_NAMESPACE
+	HRESULT SetValue(SAFEARRAY**, const XLOPER12 &);
+	//void ClearValue(SAFEARRAY*);
+}
