@@ -184,7 +184,7 @@ namespace XLL_NAMESPACE
 			{
 				// todo: report exception
 			}
-			return const_cast<ExcelVariant*>(&ExcelVariant::ErrValue);
+			return const_cast<LPXLOPER12>(&Constants::ErrValue);
 		}
 
 		static inline FunctionInfo& GetFunctionInfo()

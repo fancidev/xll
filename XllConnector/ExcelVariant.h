@@ -11,6 +11,20 @@ namespace XLL_NAMESPACE
 	{
 	};
 
+	struct Constants
+	{
+		static const XLOPER12 Empty;
+		static const XLOPER12 Missing;
+		static const XLOPER12 ErrNull;
+		static const XLOPER12 ErrDiv0;
+		static const XLOPER12 ErrValue;
+		static const XLOPER12 ErrRef;
+		static const XLOPER12 ErrName;
+		static const XLOPER12 ErrNum;
+		static const XLOPER12 ErrNA;
+		static const XLOPER12 ErrGettingData;
+	};
+
 	// Wraps an XLOPER12 and automatically releases memory on destruction.
 	// Use this class when you pass arguments to an Excel function.
 	class ExcelVariant : public XLOPER12
@@ -32,9 +46,9 @@ namespace XLL_NAMESPACE
 
 
 	public:
-		static const ExcelVariant Empty;
-		static const ExcelVariant Missing;
-		static const ExcelVariant ErrValue;
+		//static const ExcelVariant Empty;
+		//static const ExcelVariant Missing;
+		//static const ExcelVariant ErrValue;
 
 		ExcelVariant()
 		{
