@@ -19,7 +19,8 @@ namespace XLL_NAMESPACE
 	{
 		static_assert((Attributes & ~(
 			XLL_VOLATILE | XLL_NOT_VOLATILE |
-			XLL_THREADSAFE | XLL_NOT_THREADSAFE)) == 0,
+			XLL_THREADSAFE | XLL_NOT_THREADSAFE |
+			XLL_HEAVY | XLL_LIGHT)) == 0,
 			"Unknown attributes specified.");
 
 		static_assert(XLL_NO_MORE_THAN_ONE_BIT_SET(
@@ -29,6 +30,10 @@ namespace XLL_NAMESPACE
 		static_assert(XLL_NO_MORE_THAN_ONE_BIT_SET(
 			Attributes & (XLL_THREADSAFE | XLL_NOT_THREADSAFE)),
 			"Only one of XLL_THREADSAFE and XLL_NOT_THREADSAFE may be set.");
+
+		static_assert(XLL_NO_MORE_THAN_ONE_BIT_SET(
+			Attributes & (XLL_HEAVY | XLL_LIGHT)),
+			"Only one of XLL_HEAVY and XLL_LIGHT may be set.");
 
 		enum
 		{
@@ -46,7 +51,15 @@ namespace XLL_NAMESPACE
 			(XLL_DEFAULT_THREADSAFE) ? XLL_THREADSAFE : 0
 		};
 
-		enum { value = volatility_value | threadsafe_value };
+		enum
+		{
+			heaviness_value =
+			(Attributes & XLL_HEAVY) ? XLL_HEAVY :
+			(Attributes & XLL_LIGHT) ? 0 :
+			(XLL_DEFAULT_HEAVY) ? XLL_HEAVY : 0
+		};
+
+		enum { value = volatility_value | threadsafe_value | heaviness_value };
 	};
 }
 
@@ -61,12 +74,14 @@ namespace XLL_NAMESPACE
 	template <int Attributes>
 	struct FunctionAttributes
 	{
-		static_assert((Attributes & ~(XLL_VOLATILE | XLL_THREADSAFE)) == 0,
+		static_assert((Attributes & ~(XLL_VOLATILE | XLL_THREADSAFE | XLL_HEAVY)) == 0,
 			"Invalid attributes specified.");
 
 		enum { IsVolatile = (Attributes & XLL_VOLATILE) ? 1 : 0 };
 
 		enum { IsThreadSafe = (Attributes & XLL_THREADSAFE) ? 1 : 0 };
+
+		enum { IsHeavy = (Attributes & XLL_HEAVY) ? 1 : 0 };
 	};
 }
 
