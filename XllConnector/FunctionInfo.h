@@ -60,10 +60,10 @@ namespace XLL_NAMESPACE
 		}
 
 		template <int Attributes, typename TRet, typename... TArgs>
-		static FunctionInfo& Create(TRet(__stdcall *func)(TArgs...))
+		static FunctionInfo& Create(TRet(__stdcall *func)(TArgs...), FARPROC stub = 0)
 		{
 			const wchar_t *typeText = GetTypeTextImpl<wchar_t, Attributes>(func);
-			registry().emplace_back((FARPROC)func, typeText);
+			registry().emplace_back((stub == 0)? (FARPROC)func : stub, typeText);
 			return registry().back();
 		}
 	};

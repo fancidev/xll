@@ -83,6 +83,33 @@
 #endif
 
 //
+// XLL_GENERATE_WRAPPER_STUB, XLL_WRAPPER_STUB_PREFIX
+//
+// Controls the name of UDF wrappers Xll Connector export from
+// the DLL.
+//
+// If XLL_GENERATE_WRAPPER_STUB is defined to a non-zero value,
+// Xll Connector generates a stub function for each UDF wrapper
+// and exports this stub from the DLL. The name of the stub is
+// XLL_WRAPPER_STUB_PREFIX followed the Excel-visible name of
+// the UDF. Xll Connector also registers these stubs by name to
+// Excel; if stubs are not generated, Xll Connector registers
+// wrappers by ordinal.
+//
+// Generating a stub may be useful if you want to debug the wrapper
+// or to hide the signature text of your UDF. On the downside, it
+// incurs an extra indirect jump instruction for each UDF call.
+//
+
+#ifndef XLL_GENERATE_WRAPPER_STUB
+#define XLL_GENERATE_WRAPPER_STUB 1
+#endif
+
+#ifndef XLL_WRAPPER_STUB_PREFIX
+#define XLL_WRAPPER_STUB_PREFIX XL12
+#endif
+
+//
 // ALL THE FOLLOWING ARE IMPLEMENTATION DETAILS THAT YOU SHOULDN'T ALTER.
 //
 

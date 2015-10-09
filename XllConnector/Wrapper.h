@@ -160,7 +160,11 @@ namespace XLL_NAMESPACE
 		// Actual entry point called by Excel.
 		//
 
-		static __declspec(dllexport) LPXLOPER12 __stdcall 
+		static 
+#if !XLL_GENERATE_WRAPPER_STUB
+		__declspec(dllexport)
+#endif
+		LPXLOPER12 __stdcall 
 		EntryPoint(typename ArgumentMarshaler<TArgs>::WireType... args) 
 		XLL_NOEXCEPT
 		{
@@ -187,9 +191,10 @@ namespace XLL_NAMESPACE
 			return const_cast<LPXLOPER12>(&Constants::ErrValue);
 		}
 
-		static inline FunctionInfo& GetFunctionInfo()
+		static inline FunctionInfo& GetFunctionInfo(FARPROC stub = 0)
 		{
-			static FunctionInfo& s_info = FunctionInfo::Create<Attributes>(EntryPoint);
+			static FunctionInfo& s_info = 
+				FunctionInfo::Create<Attributes>(EntryPoint, stub);
 			return s_info;
 		}
 	};
@@ -214,7 +219,11 @@ namespace XLL_NAMESPACE
 		// Actual entry point called by Excel.
 		//
 
-		static __declspec(dllexport) void __stdcall
+		static 
+#if !XLL_GENERATE_WRAPPER_STUB
+		__declspec(dllexport)
+#endif
+		void __stdcall
 		EntryPoint(typename ArgumentMarshaler<TArg1>::WireType arg1,
 				   typename ArgumentMarshaler<TArgs>::WireType... args)
 		XLL_NOEXCEPT
@@ -234,9 +243,9 @@ namespace XLL_NAMESPACE
 			}
 		}
 
-		static inline FunctionInfo& GetFunctionInfo()
+		static inline FunctionInfo& GetFunctionInfo(FARPROC stub = 0)
 		{
-			static FunctionInfo& s_info = FunctionInfo::Create<Attributes>(EntryPoint);
+			static FunctionInfo& s_info = FunctionInfo::Create<Attributes>(EntryPoint, stub);
 			return s_info;
 		}
 	};
@@ -266,12 +275,12 @@ namespace
 		static ::XLL_NAMESPACE::FunctionInfoBuilder functionInfoBuilder;
 
 		static inline ::XLL_NAMESPACE::FunctionInfoBuilder 
-			BuildFunctionInfo(LPCWSTR name)
+			BuildFunctionInfo(LPCWSTR name, FARPROC stub = 0)
 		{
 			return ::XLL_NAMESPACE::FunctionInfoBuilder(
 				::XLL_NAMESPACE::XLWrapper<Func, func, 
 				::XLL_NAMESPACE::NormalizeAttributes<Attributes>::value>
-				::GetFunctionInfo()).Name(name);
+				::GetFunctionInfo(stub)).Name(name);
 		}
 	};
 }
@@ -289,9 +298,36 @@ namespace
 //   *) The macro may be put in any namespace.
 //
 
+#if XLL_GENERATE_WRAPPER_STUB
+
+#define XLL_CONCAT_(x,y) x##y
+#define XLL_CONCAT(x,y) XLL_CONCAT_(x,y)
+
+#define XLL_QUOTE_(x) #x
+#define XLL_QUOTE(x) XLL_QUOTE_(x)
+
+#define XLL_STUB_NAME(name) XLL_CONCAT(XLL_WRAPPER_STUB_PREFIX,name)
+
+#define EXPORT_XLL_FUNCTION_AS(f, name, ...) \
+	extern "C" __declspec(dllexport, naked) void XLL_STUB_NAME(name)() \
+	{ \
+		static const auto proc = ::XLL_NAMESPACE::XLWrapper < decltype(f), f, \
+			::XLL_NAMESPACE::NormalizeAttributes<__VA_ARGS__>::value > ::EntryPoint; \
+		__asm { jmp [proc] } \
+	} \
+	::XLL_NAMESPACE::FunctionInfoBuilder \
+		XLLocalWrapper<decltype(f), f, __VA_ARGS__>::functionInfoBuilder = \
+		XLLocalWrapper<decltype(f), f, __VA_ARGS__>::BuildFunctionInfo( \
+		XLL_CONCAT(L,XLL_QUOTE(name)), (FARPROC)(XLL_STUB_NAME(name)))
+
+#else
+
 #define EXPORT_XLL_FUNCTION_AS(f, name, ...) \
 	::XLL_NAMESPACE::FunctionInfoBuilder \
 		XLLocalWrapper<decltype(f), f, __VA_ARGS__>::functionInfoBuilder = \
 		XLLocalWrapper<decltype(f), f, __VA_ARGS__>::BuildFunctionInfo(L##name)
 
-#define EXPORT_XLL_FUNCTION(f,...) EXPORT_XLL_FUNCTION_AS(f, #f, __VA_ARGS__)
+#endif
+
+
+#define EXPORT_XLL_FUNCTION(f,...) EXPORT_XLL_FUNCTION_AS(f, f, __VA_ARGS__)
