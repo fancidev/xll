@@ -160,11 +160,10 @@ namespace XLL_NAMESPACE
 		// Actual entry point called by Excel.
 		//
 
-		static 
-#if !XLL_GENERATE_WRAPPER_STUB
+#if !XLL_GENERATE_WRAPPER_STUB || _WIN64
 		__declspec(dllexport)
 #endif
-		LPXLOPER12 __stdcall 
+		static LPXLOPER12 __stdcall 
 		EntryPoint(typename ArgumentMarshaler<TArgs>::WireType... args) 
 		XLL_NOEXCEPT
 		{
@@ -219,11 +218,10 @@ namespace XLL_NAMESPACE
 		// Actual entry point called by Excel.
 		//
 
-		static 
-#if !XLL_GENERATE_WRAPPER_STUB
+#if !XLL_GENERATE_WRAPPER_STUB || _WIN64
 		__declspec(dllexport)
 #endif
-		void __stdcall
+		static void __stdcall
 		EntryPoint(typename ArgumentMarshaler<TArg1>::WireType arg1,
 				   typename ArgumentMarshaler<TArgs>::WireType... args)
 		XLL_NOEXCEPT
@@ -285,6 +283,12 @@ namespace
 	};
 }
 
+#define XLL_CONCAT_(x,y) x##y
+#define XLL_CONCAT(x,y) XLL_CONCAT_(x,y)
+
+#define XLL_QUOTE_(x) #x
+#define XLL_QUOTE(x) XLL_QUOTE_(x)
+
 //
 // EXPORT_XLL_FUNCTION, EXPORT_XLL_FUNCTION_AS
 //
@@ -298,13 +302,7 @@ namespace
 //   *) The macro may be put in any namespace.
 //
 
-#if XLL_GENERATE_WRAPPER_STUB
-
-#define XLL_CONCAT_(x,y) x##y
-#define XLL_CONCAT(x,y) XLL_CONCAT_(x,y)
-
-#define XLL_QUOTE_(x) #x
-#define XLL_QUOTE(x) XLL_QUOTE_(x)
+#if XLL_GENERATE_WRAPPER_STUB && !_WIN64
 
 #define XLL_STUB_NAME(name) XLL_CONCAT(XLL_WRAPPER_STUB_PREFIX,name)
 
@@ -325,7 +323,8 @@ namespace
 #define EXPORT_XLL_FUNCTION_AS(f, name, ...) \
 	::XLL_NAMESPACE::FunctionInfoBuilder \
 		XLLocalWrapper<decltype(f), f, __VA_ARGS__>::functionInfoBuilder = \
-		XLLocalWrapper<decltype(f), f, __VA_ARGS__>::BuildFunctionInfo(L##name)
+		XLLocalWrapper<decltype(f), f, __VA_ARGS__>::BuildFunctionInfo( \
+		XLL_CONCAT(L,XLL_QUOTE(name)))
 
 #endif
 
