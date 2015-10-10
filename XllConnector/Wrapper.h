@@ -306,6 +306,7 @@ namespace
 
 #define XLL_STUB_NAME(name) XLL_CONCAT(XLL_WRAPPER_STUB_PREFIX,name)
 
+#if 0
 #define EXPORT_XLL_FUNCTION_AS(f, name, ...) \
 	extern "C" __declspec(dllexport, naked) void XLL_STUB_NAME(name)() \
 	{ \
@@ -317,6 +318,33 @@ namespace
 		XLLocalWrapper<decltype(f), f, __VA_ARGS__>::functionInfoBuilder = \
 		XLLocalWrapper<decltype(f), f, __VA_ARGS__>::BuildFunctionInfo( \
 		XLL_CONCAT(L,XLL_QUOTE(name)), (FARPROC)(XLL_STUB_NAME(name)))
+#endif
+
+#pragma pack(push, 1)
+struct JmpInstruction
+{
+	unsigned char opcode[2]; // FF 25: Jump near, absolute indirect
+	void *ptr;
+};
+#pragma pack(pop)
+
+#pragma code_seg(push, ".xllstub")
+#pragma code_seg(pop)
+
+#define XLL_WRAPPER(f, ...) \
+	::XLL_NAMESPACE::XLWrapper <decltype(f), f, \
+	::XLL_NAMESPACE::NormalizeAttributes<__VA_ARGS__>::value >
+
+#define EXPORT_XLL_FUNCTION_AS(f, name, ...) \
+	static auto XLL_CONCAT(XLL_STUB_NAME(name),_EntryPoint) = \
+		XLL_WRAPPER(f, __VA_ARGS__)::EntryPoint; \
+	extern "C" __declspec(dllexport, allocate(".xllstub")) \
+	JmpInstruction XLL_STUB_NAME(name) = { { 0xFF, 0x25 }, \
+		& XLL_CONCAT(XLL_STUB_NAME(name),_EntryPoint) }; \
+	::XLL_NAMESPACE::FunctionInfoBuilder \
+		XLLocalWrapper<decltype(f), f, __VA_ARGS__>::functionInfoBuilder = \
+		XLLocalWrapper<decltype(f), f, __VA_ARGS__>::BuildFunctionInfo( \
+		XLL_CONCAT(L,XLL_QUOTE(name)), (FARPROC)&XLL_STUB_NAME(name))
 
 #else
 
