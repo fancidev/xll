@@ -107,23 +107,5 @@ namespace XLL_NAMESPACE
 			_info.helpTopic = helpTopic;
 			return (*this);
 		}
-/*
-		FunctionInfoBuilder& Pure()
-		{
-			_info.isPure = true;
-			return (*this);
-		}
-
-		FunctionInfoBuilder& Volatile()
-		{
-			_info.isPure = false;
-			return (*this);
-		}
-
-		FunctionInfoBuilder& ThreadSafe()
-		{
-			_info.isThreadSafe = true;
-			return (*this);
-		}*/
 	};
 }

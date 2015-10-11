@@ -31,68 +31,30 @@
 //
 // 
 // When Excel calls a UDF, it passes arguments in "wire type", such as
-// LPXLOPER12 and primitive numeric types. XLL Connector "marshals in"
-// these arguments into "user type" and pass them to the UDF. This is
-// implemented by ArgumentMarshaler<T>::Marshal<In>(). You can specialize
+// LPXLOPER12 and primitive numeric types. XLL Connector marshals these
+// arguments into "user type" and then passes them to the UDF. This is
+// implemented by ArgumentMarshaler<T>::Marshal(). You can specialize
 // this struct to support marshalling for custom types.
 //
 // When the UDF returns, XLL Connector marshals the return value to
 // LPXLOPER12 and return back to Excel. This is implemented by one of
-// the overloads of SetValue(). If an exception is thrown, the wrapper
+// the overloads of CreateValue(). If an exception is thrown, the wrapper
 // returns #VALUE! to Excel.
-//
-// A special case is when an argument is marked as "in/out". In this
-// case, XLL Connector calls ArgumentMarshaler<T>::Marshal<InOut>()
-// to marshal in the argument, and the adapter object must marshal out
-// the updated argument value in its destructor.
-//
-// If a UDF chooses to pass the return value in-place in the first
-// argument, it must return void and implement ArgumentMarshaler<T>
-// ::Marshal<InOut>() for the type of that argument. If non-trivial 
-// marshalling is required, the marshaler must be an object that
-// implements out-marshaling in its destructor, which is called
-// after the UDF returns or an exception is thrown. Since there is
-// no way to return an error to Excel, either the UDF must always
-// succeeded, or the marshaller must handle a state of the argument
-// when the UDF exits due to an exception.
 //
 
 namespace XLL_NAMESPACE
 {
-#if 0
-	// 
-	// ArgumentDirection
-	//
-	// Specifies the direction of a UDF argument. Possible values are:
-	//
-	//   In     In only; this is the default
-	//   InOut  Modified-in-place argument, which stores return value
-	//          when the UDF exits
-	//   Out    (not implemented) Same as InOut except that it must be
-	//          the last argument and must not appear in the argument
-	//          list shown to user
-	//
-
-	enum ArgumentDirection
-	{
-		In = 0,
-		InOut = 1,
-		// Out=2, // not implemented
-	};
-#endif
-
 	//
 	// ArgumentMarshaler<T>
 	//
-	// Marshals an argument in-between Excel and UDF. The following
-	// members are required:
+	// Marshals an argument from Excel to UDF. The following members
+	// are required:
 	//
 	//   UserType      argument type of the UDF
 	//   WireType      argument type exposed to Excel
-	//   MarshalIn     marshals in argument from Excel to UDF
-	//   MarshalInOut  marshals in argument from Excel to UDF;
-	//                 after the UDF returns, marshals out the
-	//                 argument back to Excel
+	//   Marshal()     marshals an argument from Excel to UDF; i.e.
+	//                 takes an input of type WireType and produces
+	//                 an output that can be converted to UserType
 	//
 	// You must specialize this structure to implement marshalling
 	// for a given user type. The default implementation generates
@@ -104,8 +66,7 @@ namespace XLL_NAMESPACE
 	{
 		// typedef U UserType;
 		// typedef W WireType;
-		// static inline ? MarshalIn(WireType arg);
-		// static inline ? MarshalInOut(WireType arg);
+		// static inline ? Marshal(WireType arg);
 		template <typename T> struct always_false : std::false_type {};
 		static_assert(always_false<T>::value,
 			"Do not know how to marshal the supplied argument type. "
@@ -124,23 +85,14 @@ namespace XLL_NAMESPACE
 	template <
 		typename ArgUserType,
 		typename ArgWireType = ArgUserType,
-		typename ArgAdapterType = ArgUserType,
-		typename InOutAdapterType = void>
+		typename ArgAdapterType = ArgUserType>
 	struct ArgumentMarshalerImpl
 	{
 		typedef ArgUserType UserType;
 		typedef ArgWireType WireType;
 
-		static inline ArgAdapterType MarshalIn(ArgWireType arg)
+		static inline ArgAdapterType Marshal(ArgWireType arg)
 		{
-			return arg;
-		}
-
-		static inline InOutAdapterType MarshalInOut(ArgWireType arg)
-		{
-			static_assert(
-				!std::is_void<InOutAdapterType>::value,
-				"In/out marshalling is not supported for this type.");
 			return arg;
 		}
 	};
@@ -158,7 +110,7 @@ namespace XLL_NAMESPACE
 
 	IMPLEMENT_ARGUMENT_MARSHALER(double);
 	IMPLEMENT_ARGUMENT_MARSHALER(int);
-	IMPLEMENT_ARGUMENT_MARSHALER(FP12*,FP12*,FP12*,FP12*);
+	IMPLEMENT_ARGUMENT_MARSHALER(FP12*);
 
 	//
 	// String marshalling

@@ -138,6 +138,7 @@ double PartialSum(SAFEARRAY *matrix, int count)
 
 EXPORT_XLL_FUNCTION(PartialSum);
 
+#if 0
 // ShuffleColumns -- reorder the columns in a matrix randomly.
 // 
 // This example shows how to use FP12* type argument, and how to return
@@ -145,7 +146,7 @@ EXPORT_XLL_FUNCTION(PartialSum);
 //
 // This example also shows that the FP12* array is passed in row-major.
 
-void ShuffleColumns(FP12 *mat)
+FP12* ShuffleColumns(FP12 *mat)
 {
 	if (mat && mat->rows>0 && mat->columns > 0)
 	{
@@ -166,6 +167,8 @@ void ShuffleColumns(FP12 *mat)
 			}
 		}
 	}
+	return mat;
 }
 
 EXPORT_XLL_FUNCTION(ShuffleColumns, XLL_THREADSAFE);
+#endif

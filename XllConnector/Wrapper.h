@@ -109,6 +109,7 @@ namespace XLL_NAMESPACE
 			__declspec(thread) extern XLOPER12 threadReturnValue;
 			return &threadReturnValue;
 #else
+			// TODO: set xlbitDLLFree to free the variable
 			LPXLOPER12 p = (LPXLOPER12)malloc(sizeof(XLOPER12));
 			if (p == nullptr)
 				throw std::bad_alloc();
@@ -130,15 +131,24 @@ namespace XLL_NAMESPACE
 //   1) handles argument and return value marshalling, and
 //   2) provides a __stdcall entry point for Excel to call.
 //
-// By default, the entry point is exported by its decorated name,
-// which contains the name of the underlying function as well as
-// the name of its argument types. If this is a concern to you, 
-// wrap your function in another function that doesn't contain
-// sensitive names.
+// If XLL_GENERATE_STUB is not defined or set to zero, XLL Connector
+// exports the entry point by its decorated name, which contains the
+// name of the underlying function as well as its argument types. If
+// this is not desired, wrap your function in another function that
+// doesn't contain sensitive names, or define XLL_GENERATE_STUB to 1.
 //
-// NOTE: In 32-bit build, we may create and export a naked function
-// that contains a single jmp instruction to jump to the true entry
-// point. In 64-bit build, this is not supported by Visual C++.
+// When XLL_GENERATE_STUB is defined to non-zero, XLL Connector
+// creates a stub for each wrapper function. This stub contains a
+// single JMP instruction to jump to the actual start of the wrapper
+// function. This makes it easier to identify the wrapper function
+// in the DLL's export table when debugging.
+//
+// The XLL_GENERATE_STUB macro can be defined differently in each
+// translation unit.
+//
+// Implementation Note: Because Visual C++ does not support inline
+// assembly in 64-bit mode, the stub is directly emitted as machine
+// code. 
 // 
 
 namespace XLL_NAMESPACE
@@ -160,7 +170,7 @@ namespace XLL_NAMESPACE
 		// Actual entry point called by Excel.
 		//
 
-#if !XLL_GENERATE_WRAPPER_STUB || _WIN64
+#if !XLL_GENERATE_WRAPPER_STUB
 		__declspec(dllexport)
 #endif
 		static LPXLOPER12 __stdcall 
@@ -171,12 +181,13 @@ namespace XLL_NAMESPACE
 			{
 				LPXLOPER12 pvRetVal = AllocateReturnValue(IsThreadSafe);
 				HRESULT hr = CreateValue(pvRetVal,
-					func(ArgumentMarshaler<TArgs>::MarshalIn(args)...));
+					func(ArgumentMarshaler<TArgs>::Marshal(args)...));
 				if (FAILED(hr))
 				{
 					throw std::invalid_argument(
 						"Cannot convert return value to XLOPER12.");
 				}
+				// TODO: delete malloc-ed return value on return
 				return pvRetVal;
 			}
 			catch (const std::exception &)
@@ -194,56 +205,6 @@ namespace XLL_NAMESPACE
 		{
 			static FunctionInfo& s_info = 
 				FunctionInfo::Create<Attributes>(EntryPoint, stub);
-			return s_info;
-		}
-	};
-
-	template <typename Func, Func *func, int Attributes>
-	struct XLWrapper < Func, func, Attributes, void() >
-		: FunctionAttributes<Attributes>
-	{
-		template <typename T> struct always_false : std::false_type {};
-		static_assert(always_false<Func>::value,
-			"A void-returning function must take its at least "
-			"one modified-in-place argument.");
-	};
-
-	template <typename Func, Func *func, int Attributes, typename TArg1, typename... TArgs>
-	struct XLWrapper < Func, func, Attributes, void(TArg1, TArgs...) >
-		: FunctionAttributes<Attributes>
-	{
-		//
-		// EntryPoint
-		//
-		// Actual entry point called by Excel.
-		//
-
-#if !XLL_GENERATE_WRAPPER_STUB || _WIN64
-		__declspec(dllexport)
-#endif
-		static void __stdcall
-		EntryPoint(typename ArgumentMarshaler<TArg1>::WireType arg1,
-				   typename ArgumentMarshaler<TArgs>::WireType... args)
-		XLL_NOEXCEPT
-		{
-			try
-			{
-				func(ArgumentMarshaler<TArg1>::MarshalInOut(arg1),
-					 ArgumentMarshaler<TArgs>::MarshalIn(args)...);
-			}
-			catch (const std::exception &)
-			{
-				// todo: report exception
-			}
-			catch (...)
-			{
-				// todo: report exception
-			}
-		}
-
-		static inline FunctionInfo& GetFunctionInfo(FARPROC stub = 0)
-		{
-			static FunctionInfo& s_info = FunctionInfo::Create<Attributes>(EntryPoint, stub);
 			return s_info;
 		}
 	};
@@ -302,7 +263,7 @@ namespace
 //   *) The macro may be put in any namespace.
 //
 
-#if XLL_GENERATE_WRAPPER_STUB && !_WIN64
+#if XLL_GENERATE_WRAPPER_STUB
 
 #define XLL_STUB_NAME(name) XLL_CONCAT(XLL_WRAPPER_STUB_PREFIX,name)
 
