@@ -18,7 +18,7 @@ namespace custom_ns
 	}
 }
 
-EXPORT_XLL_FUNCTION_AS(custom_ns::GetCircleArea, GetCircleArea);
+EXPORT_XLL_FUNCTION_AS(custom_ns::GetCircleArea, GetCircleArea, XLL_LIGHT);
 
 namespace
 {

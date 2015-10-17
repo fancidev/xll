@@ -80,3 +80,37 @@ ExcelVariant ExcelCall(int xlfn, const T&... args)
 	return vResult;
 }
 #endif
+
+namespace XLL_NAMESPACE
+{
+	// How to: Call XLL Functions from the Function Wizard or Replace Dialog Boxes
+	// https://msdn.microsoft.com/EN-US/library/office/bb687909.aspx
+
+	static BOOL CALLBACK IsDialogBoxOpen_Callback(HWND hwnd, LPARAM lParam)
+	{
+		bool *pFound = (bool*)lParam;
+
+		DWORD dwProcessId = 0;
+		GetWindowThreadProcessId(hwnd, &dwProcessId);
+		if (dwProcessId == GetCurrentProcessId())
+		{
+			WCHAR szClassName[100];
+			if (GetClassNameW(hwnd, szClassName, ARRAYSIZE(szClassName)))
+			{
+				if (_wcsnicmp(szClassName, L"bosa_sdm_XL", 11) == 0)
+				{
+					*pFound = true;
+					return FALSE; // stop iterating
+				}
+			}
+		}
+		return TRUE; // keep iterating
+	}
+
+	bool IsDialogBoxOpen()
+	{
+		bool bFoundDialog = false;
+		EnumWindows(IsDialogBoxOpen_Callback, (LPARAM)&bFoundDialog);
+		return bFoundDialog;
+	}
+}

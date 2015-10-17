@@ -22,4 +22,8 @@ namespace XLL_NAMESPACE
 		explicit ExcelException(int errorCode);
 		const char* what() const override { return m_errorMessage; }
 	};
+
+	// Returns true if the Function Wizard or Replace dialog box is
+	// open in the current Excel session.
+	bool IsDialogBoxOpen();
 }

@@ -7,6 +7,7 @@
 #include "FunctionInfo.h"
 #include "Conversion.h"
 #include "Marshal.h"
+#include "Invoke.h"
 
 //
 // strip_cc, strip_cc_t
@@ -179,6 +180,11 @@ namespace XLL_NAMESPACE
 		{
 			try
 			{
+				if (IsHeavy && IsDialogBoxOpen())
+				{
+					return const_cast<LPXLOPER12>(&Constants::ErrNA);
+				}
+
 				LPXLOPER12 pvRetVal = AllocateReturnValue(IsThreadSafe);
 				HRESULT hr = CreateValue(pvRetVal,
 					func(ArgumentMarshaler<TArgs>::Marshal(args)...));
