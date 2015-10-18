@@ -1,0 +1,6 @@
+LIBRARY
+EXPORTS
+	SetExcel12EntryPt
+	xlAutoOpen
+	xlAutoClose
+	IsProfilerPresent
