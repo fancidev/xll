@@ -24,9 +24,17 @@ struct CallStackEntry
 
 static std::stack<CallStackEntry> thunkCallStack;
 
-// returns the address of the real function
-static FARPROC __cdecl precall(RegisteredFunctionInfo *pInfo, void *returnAddress, ...)
+static RegisteredFunctionInfo* __cdecl GetStubFunctionInfo(void *stubReturnAddress)
 {
+	// TODO: do the actual work
+	return pFunctionInfo;
+}
+
+// returns the address of the real function
+static FARPROC __cdecl precall(void *stubReturnAddress, void *returnAddress, ...)
+{
+	RegisteredFunctionInfo *pInfo = GetStubFunctionInfo(stubReturnAddress);
+
 	std::wstring msg;
 	msg = L"Precall(" + pInfo->functionName + L")\n";
 	OutputDebugStringW(msg.c_str());
@@ -48,36 +56,50 @@ static void* __cdecl postcall(size_t returnValue)
 	return entry.returnAddress;
 }
 
+// The import entry looks like this:
+// JMP ds:[xx yy zz ww]
+//
+// We replace ds:[xx yy zz ww] with the address of our own stub.
+// This stub contains a single instruction:
+//   call thunk
+// This pushes the EIP onto the stack, so that "thunk" can know
+// which function is called from.
+//
 // When the thunk is called, the stack looks like this:
 //
 // ARG(n)
 // ...
 // ARG2
 // ARG1
-// RETURN ADDRESS <- ESP
+// REAL RETURN ADDRESS
+// STUB RETURN ADDRESS <- ESP
 //
 __declspec(naked) void thunk()
 {
 	__asm
 	{
-		; // top of stack contains return address
-		push pFunctionInfo;
+		; // Top of stack contains stub return address; it is used
+		; // to identify the UDF being called. On top of it is the
+		; // real return address.
 		call precall;
-		; // EAX now contains the address of the UDF
+		; // EAX now contains the address of the UDF.
 
-		; // cleans the stack (pFunctionInfo & return address)
+		; // Pops StubReturnAddress and RealReturnAddress off the
+		; // stack.
 		add esp, 8;
+		; // Now ESP points to the first actual argument to the UDF.
 
-		; // ESP points to the first real argument to the UDF
 		; // Call the UDF now.
 		call eax;
 
 		; // Now EAX contains the return value of the UDF.
-		; // Because all UDF are __stdcall, the arguments are
-		; // cleared from the stack.
-		; // TODO: handle double return value
+		; // Because all UDFs are __stdcall, the arguments are
+		; // already popped from the stack.
 
-		; // Log the return value.
+		; // All return value types except double return value
+		; // in EAX; double returns value in ST(0). We push
+		; // both onto the stack, and then call postcall to
+		; // log the return value.
 		push eax;
 		call postcall;
 
@@ -93,6 +115,11 @@ __declspec(naked) void thunk()
 	}
 }
 
+__declspec(naked) void stub()
+{
+	__asm call thunk;
+}
+
 bool InstallThunk(RegisteredFunctionInfo *pInfo)
 {
 	unsigned char *instruction = (unsigned char *)(pInfo->entryPointAddress);
@@ -106,7 +133,10 @@ bool InstallThunk(RegisteredFunctionInfo *pInfo)
 		memcpy(&pAddress, &instruction[2], 4);
 		pInfo->importThunkLocation = pAddress;
 		pInfo->realProcAddress = *pAddress;
-		*pAddress = (FARPROC)thunk;
+
+		// Create a code stub with a single instruction:
+		// CALL thunk
+		*pAddress = (FARPROC)stub; // thunk;
 
 		pFunctionInfo = new RegisteredFunctionInfo;
 		*pFunctionInfo = *pInfo;
