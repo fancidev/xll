@@ -2,6 +2,7 @@
 #include "XLCALL.H"
 #include "ExcelHelper.h"
 #include <stack>
+#include <map>
 
 BOOL WINAPI DllMain(HANDLE hInstance, ULONG fdwReason, LPVOID lpReserved)
 {
@@ -115,9 +116,35 @@ __declspec(naked) void thunk()
 	}
 }
 
+typedef const void * address_t;
+
+static const address_t s_thunkAddress = thunk;
+
 __declspec(naked) void stub()
 {
-	__asm call thunk;
+	__asm call [s_thunkAddress];
+}
+
+struct ThunkInfo
+{
+	address_t stubReturnAddress;
+};
+
+std::map<address_t, ThunkInfo> s_installedThunks;
+
+#pragma pack(push, 1)
+struct StubInstruction // CALL [s_thunkAddress]
+{
+	unsigned char opcode[2]; // FF 15 
+	address_t target; // &s_thunkAddress
+};
+#pragma pack(pop)
+
+DWORD GetPageSize()
+{
+	SYSTEM_INFO systemInfo;
+	GetSystemInfo(&systemInfo);
+	return systemInfo.dwPageSize;
 }
 
 bool InstallThunk(RegisteredFunctionInfo *pInfo)
@@ -136,7 +163,26 @@ bool InstallThunk(RegisteredFunctionInfo *pInfo)
 
 		// Create a code stub with a single instruction:
 		// CALL thunk
-		*pAddress = (FARPROC)stub; // thunk;
+
+		// Allocate a page with read/write access.
+		DWORD dwPageSize = GetPageSize();
+		LPVOID page = VirtualAlloc(NULL, 100, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+		if (page != nullptr)
+		{
+			StubInstruction inst = { { 0xFF, 0x15 }, &s_thunkAddress }; // CALL thunk
+			memcpy(page, &inst, sizeof(StubInstruction));
+
+			bool ok = false;
+			DWORD dwOldProtect;
+			if (VirtualProtect(page, 100, PAGE_EXECUTE_READ, &dwOldProtect) &&
+				FlushInstructionCache(GetCurrentProcess(), page, 100))
+			{
+				ok = true;
+			}
+		}
+
+		// *pAddress = (FARPROC)stub;
+		*pAddress = (FARPROC)page;
 
 		pFunctionInfo = new RegisteredFunctionInfo;
 		*pFunctionInfo = *pInfo;
