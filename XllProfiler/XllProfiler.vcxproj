@@ -70,10 +70,12 @@
   <ItemGroup>
     <ClCompile Include="ExcelHelper.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="ThunkManager.cpp" />
     <ClCompile Include="XLCALL.CPP" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ExcelHelper.h" />
+    <ClInclude Include="ThunkManager.h" />
     <ClInclude Include="XLCALL.H" />
     <ClInclude Include="XLString.h" />
   </ItemGroup>

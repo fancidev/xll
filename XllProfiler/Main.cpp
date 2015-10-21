@@ -1,8 +1,7 @@
 #include <Windows.h>
 #include "XLCALL.H"
 #include "ExcelHelper.h"
-#include <stack>
-#include <map>
+#include "ThunkManager.h"
 
 BOOL WINAPI DllMain(HANDLE hInstance, ULONG fdwReason, LPVOID lpReserved)
 {
@@ -15,130 +14,10 @@ BOOL WINAPI DllMain(HANDLE hInstance, ULONG fdwReason, LPVOID lpReserved)
 	return TRUE;
 }
 
+static ThunkManager s_thunkManager;
+
+#if 0
 static RegisteredFunctionInfo *pFunctionInfo;
-
-struct CallStackEntry
-{
-	const RegisteredFunctionInfo *pInfo;
-	void *returnAddress;
-};
-
-static std::stack<CallStackEntry> thunkCallStack;
-
-static RegisteredFunctionInfo* __cdecl GetStubFunctionInfo(void *stubReturnAddress)
-{
-	// TODO: do the actual work
-	return pFunctionInfo;
-}
-
-// returns the address of the real function
-static FARPROC __cdecl precall(void *stubReturnAddress, void *returnAddress, ...)
-{
-	RegisteredFunctionInfo *pInfo = GetStubFunctionInfo(stubReturnAddress);
-
-	std::wstring msg;
-	msg = L"Precall(" + pInfo->functionName + L")\n";
-	OutputDebugStringW(msg.c_str());
-
-	CallStackEntry entry;
-	entry.pInfo = pInfo;
-	entry.returnAddress = returnAddress;
-	thunkCallStack.push(entry);
-	return pInfo->realProcAddress;
-}
-
-// Return the real return address.
-static void* __cdecl postcall(size_t returnValue)
-{
-	CallStackEntry entry = thunkCallStack.top();
-	thunkCallStack.pop();
-	std::wstring msg = L"Postcall(" + entry.pInfo->functionName + L")\n";
-	OutputDebugStringW(msg.c_str());
-	return entry.returnAddress;
-}
-
-// The import entry looks like this:
-// JMP ds:[xx yy zz ww]
-//
-// We replace ds:[xx yy zz ww] with the address of our own stub.
-// This stub contains a single instruction:
-//   call thunk
-// This pushes the EIP onto the stack, so that "thunk" can know
-// which function is called from.
-//
-// When the thunk is called, the stack looks like this:
-//
-// ARG(n)
-// ...
-// ARG2
-// ARG1
-// REAL RETURN ADDRESS
-// STUB RETURN ADDRESS <- ESP
-//
-__declspec(naked) void thunk()
-{
-	__asm
-	{
-		; // Top of stack contains stub return address; it is used
-		; // to identify the UDF being called. On top of it is the
-		; // real return address.
-		call precall;
-		; // EAX now contains the address of the UDF.
-
-		; // Pops StubReturnAddress and RealReturnAddress off the
-		; // stack.
-		add esp, 8;
-		; // Now ESP points to the first actual argument to the UDF.
-
-		; // Call the UDF now.
-		call eax;
-
-		; // Now EAX contains the return value of the UDF.
-		; // Because all UDFs are __stdcall, the arguments are
-		; // already popped from the stack.
-
-		; // All return value types except double return value
-		; // in EAX; double returns value in ST(0). We push
-		; // both onto the stack, and then call postcall to
-		; // log the return value.
-		push eax;
-		call postcall;
-
-		; // Now EAX contains the real return address.
-		; // Save it on the stack so as to return to it later.
-		push eax;
-
-		; // Restore the return value of the UDF into EAX.
-		mov eax, ss:[esp + 4];
-
-		; // Return back to the real return address.
-		ret 8
-	}
-}
-
-typedef const void * address_t;
-
-static const address_t s_thunkAddress = thunk;
-
-__declspec(naked) void stub()
-{
-	__asm call [s_thunkAddress];
-}
-
-struct ThunkInfo
-{
-	address_t stubReturnAddress;
-};
-
-std::map<address_t, ThunkInfo> s_installedThunks;
-
-#pragma pack(push, 1)
-struct StubInstruction // CALL [s_thunkAddress]
-{
-	unsigned char opcode[2]; // FF 15 
-	address_t target; // &s_thunkAddress
-};
-#pragma pack(pop)
 
 DWORD GetPageSize()
 {
@@ -191,10 +70,40 @@ bool InstallThunk(RegisteredFunctionInfo *pInfo)
 	}
 	return false;
 }
+#endif
+
+void XllBeforeCall(ThunkInfo *pThunkInfo, void *returnAddress, va_list)
+{
+	RegisteredFunctionInfo *pFunctionInfo = (RegisteredFunctionInfo*)pThunkInfo->cookie;
+	wchar_t msg[1000];
+	swprintf_s(msg, L"BeforeCall:%s:%s\n",
+		pFunctionInfo->functionName.c_str(), 
+		pFunctionInfo->typeText.c_str());
+	OutputDebugStringW(msg);
+}
+
+void XllAfterCall(ThunkInfo *pThunkInfo, size_t intRetVal)
+{
+	RegisteredFunctionInfo *pFunctionInfo = (RegisteredFunctionInfo*)pThunkInfo->cookie;
+	wchar_t msg[1000];
+	swprintf_s(msg, L"AfterCall:%s:0x%p\n",
+		pFunctionInfo->functionName.c_str(),
+		intRetVal);
+	OutputDebugStringW(msg);
+}
 
 bool __stdcall IsProfilerPresent()
 {
 	return true;
+}
+
+static void InstallThunk(const RegisteredFunctionInfo &functionInfo)
+{
+	RegisteredFunctionInfo *pFunctionInfo =
+		new RegisteredFunctionInfo(functionInfo);
+	s_thunkManager.InstallThunk(NULL,
+		pFunctionInfo->procAddress, pFunctionInfo,
+		XllBeforeCall, XllAfterCall);
 }
 
 int WINAPI xlAutoOpen()
@@ -206,7 +115,7 @@ int WINAPI xlAutoOpen()
 	{
 		if (info[i].functionName == L"GetCircleArea")
 		{
-			InstallThunk(&info[i]);
+			InstallThunk(info[i]);
 		}
 	}
 

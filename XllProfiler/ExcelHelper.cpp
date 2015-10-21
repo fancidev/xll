@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////
-// ExcelHelper.h -- utility functions for XLL
+// ExcelHelper.cpp -- utility functions for XLL
 
 #include <Windows.h>
 #include <strsafe.h>
@@ -158,7 +158,7 @@ void GetRegisteredFunctions(std::vector<RegisteredFunctionInfo> &info)
 									entry.dllName.c_str(), xProcedure);
 								if (entryPointAddress != nullptr)
 								{
-									entry.entryPointAddress = entryPointAddress;
+									entry.procAddress = entryPointAddress;
 									info.push_back(entry);
 								}
 							}

@@ -12,9 +12,7 @@ struct RegisteredFunctionInfo
 	std::wstring dllName;
 	std::wstring entryPointName;
 	std::wstring typeText;
-	FARPROC *importThunkLocation;
-	FARPROC entryPointAddress;
-	FARPROC realProcAddress;
+	FARPROC procAddress; // as returned by GetProcAddress
 };
 
 void GetRegisteredFunctions(std::vector<RegisteredFunctionInfo> &info);
